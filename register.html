@@ -54,6 +54,10 @@
   .zoom input { flex:1; }
   .done { text-align:center; }
   .done .big { font-size:46px; }
+  .done .verified { color:var(--ok); font-weight:700; margin:0 0 10px; }
+  .doneimg { width:120px; aspect-ratio:3/4; object-fit:cover; border-radius:8px; border:1px solid var(--line); }
+  .receipt { text-align:left; margin:12px 0; padding:12px; background:#f4f6fa; border-radius:8px; }
+  .receipt dd { word-break:break-all; }
   .done a { display:block; margin-top:12px; padding:12px; border-radius:8px; background:var(--navy); color:#fff; text-decoration:none; font-weight:700; }
 </style>
 </head>
@@ -89,7 +93,7 @@
 
   <section class="card hidden" id="step3">
     <h2>3. ข้อมูลติดต่อ</h2>
-    <label for="email">อีเมลที่ใช้งานจริง <small>(บังคับ — ใช้แจ้งผลตรวจรูป)</small></label>
+    <label for="email">อีเมลที่ใช้งานจริง <small>(บังคับ — ใช้ติดต่อเรื่องกิจกรรม)</small></label>
     <input id="email" type="email" autocomplete="email" placeholder="name@gmail.com">
     <div class="fieldmsg" id="emailMsg"></div>
     <label for="phone">เบอร์มือถือ <small>(บังคับ)</small></label>
@@ -146,9 +150,23 @@
 
   <section class="card done hidden" id="stepDone">
     <div class="big">✅</div>
-    <h2>ส่งข้อมูลเรียบร้อย</h2>
-    <p class="hint">รูปของคุณอยู่ระหว่างรอเจ้าหน้าที่ตรวจ (ภายใน 3 วันทำการ) ผลจะแจ้งไปที่อีเมล <b id="doneEmail"></b><br>
-      หากรูปไม่ผ่าน ให้กลับมาที่หน้านี้แล้วอัปโหลดใหม่</p>
+    <h2>ส่งข้อมูลสำเร็จ</h2>
+    <p class="verified">✔ ระบบหลังบ้านตรวจแล้ว ได้รับข้อมูลครบถ้วนถูกต้อง</p>
+    <img id="doneImg" class="doneimg" alt="รูปที่ส่ง">
+    <dl class="info receipt">
+      <dt>เลขอ้างอิง</dt><dd id="rRef"></dd>
+      <dt>ชื่อ-นามสกุล</dt><dd id="rName"></dd>
+      <dt>รหัสนักศึกษา</dt><dd id="rId"></dd>
+      <dt>อีเมล</dt><dd id="rEmail"></dd>
+      <dt>เบอร์มือถือ</dt><dd id="rPhone"></dd>
+      <dt>ชื่อเล่น</dt><dd id="rNick"></dd>
+      <dt>รูปถ่าย</dt><dd id="rPhoto"></dd>
+      <dt>บันทึกเมื่อ</dt><dd id="rTime"></dd>
+      <dt>สถานะรูป</dt><dd><span class="badge" id="rStatus"></span></dd>
+    </dl>
+    <p class="hint">📸 แคปหน้าจอนี้เก็บไว้เป็นหลักฐาน<br>
+      เจ้าหน้าที่จะตรวจรูปภายใน 3 วันทำการ — <b>ไม่มีอีเมลแจ้งผล</b> ให้กลับมาที่หน้านี้ กรอกรหัสนักศึกษาและนามสกุล
+      เพื่อดูสถานะ หากขึ้น "ไม่ผ่าน" จะแสดงเหตุผล ให้อัปโหลดรูปใหม่</p>
     <a href="myqr.html" id="lnkQr">ขั้นต่อไป: เปิด "QR เช็คชื่อของฉัน"</a>
   </section>
 </main>
@@ -204,6 +222,14 @@
         $('vStatus').textContent = r.photoStatus;
         if (r.rejectReason || r.photoStatus === 'ไม่ผ่าน') {
           $('vReject').textContent = '❌ รูปเดิมไม่ผ่าน: ' + (r.rejectReason || 'ไม่เป็นไปตามเกณฑ์') + ' — กรุณาอัปโหลดรูปใหม่';
+          show('vReject', true);
+        } else if (r.photoStatus === 'อนุมัติ') {
+          $('vReject').textContent = '✅ รูปของคุณผ่านการตรวจแล้ว ไม่ต้องส่งใหม่ (ส่งใหม่ได้หากต้องการเปลี่ยนรูป/ข้อมูล แต่ต้องรอตรวจอีกครั้ง)';
+          $('vReject').style.cssText = 'background:#e7f6ee;border-color:#a6dcbd;color:var(--ok)';
+          show('vReject', true);
+        } else if (r.photoStatus === 'รอตรวจ') {
+          $('vReject').textContent = '⏳ ส่งข้อมูลแล้ว อยู่ระหว่างรอเจ้าหน้าที่ตรวจรูป';
+          $('vReject').style.cssText = 'background:#fff6d6;border-color:#f2d27a;color:#7a5b00';
           show('vReject', true);
         }
         $('email').value = r.email || '';
@@ -338,11 +364,20 @@
     const okE = checkField($('email'), $('emailMsg'), () => emailProblem($('email').value), true);
     const okP = checkField($('phone'), $('phoneMsg'), phoneProblem, true);
     if (!okE || !okP || !img) return;
-    $('btnSubmit').disabled = true; say($('msg2'), 'กำลังอัปโหลด…', true);
+    $('btnSubmit').disabled = true; say($('msg2'), 'กำลังอัปโหลดและตรวจสอบข้อมูลกับระบบ… (อย่าปิดหน้านี้)', true);
+    const photo = exportJpeg();
     google.script.run
       .withSuccessHandler(r => {
-        if (!r.ok) { say($('msg2'), r.msg); return refreshSubmit(); }
-        $('doneEmail').textContent = $('email').value.trim().toLowerCase();
+        // ขึ้น "สำเร็จ" เฉพาะเมื่อเซิร์ฟเวอร์อ่านข้อมูลกลับจากชีต/Drive แล้วยืนยันว่าครบ (r.receipt)
+        if (!r.ok || !r.receipt) { say($('msg2'), r.msg || 'ไม่ได้รับการยืนยันจากระบบ กรุณากดบันทึกอีกครั้ง'); return refreshSubmit(); }
+        const c = r.receipt;
+        $('rRef').textContent = c.ref; $('rName').textContent = c.fullName; $('rId').textContent = c.id;
+        $('rEmail').textContent = c.email;
+        $('rPhone').textContent = c.phone.replace(/^(\d{3})(\d{3})(\d{4})$/, '$1-$2-$3');
+        $('rNick').textContent = c.nickname || '-';
+        $('rPhoto').textContent = 'ได้รับแล้ว (' + c.photoKB + ' KB)';
+        $('rTime').textContent = c.savedAt; $('rStatus').textContent = c.status;
+        $('doneImg').src = photo;
         ['step2', 'step3', 'step4'].forEach(id => show(id, false));
         show('stepDone', true);
         window.scrollTo(0, 0);
@@ -350,7 +385,7 @@
       .withFailureHandler(e => { say($('msg2'), 'เกิดข้อผิดพลาด: ' + e.message); refreshSubmit(); })
       .registerSubmit({ id: current.id, lastName: current.lastName, email: $('email').value.trim(),
                         phone: phoneDigits(), nickname: $('nick').value.trim(),
-                        consent: $('consent').checked, photo: exportJpeg() });
+                        consent: $('consent').checked, photo: photo });
   };
 </script>
 </body>

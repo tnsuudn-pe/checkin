@@ -158,7 +158,7 @@
     const s = e.target.dataset.s; if (!s) return;
     let reason = '';
     if (s === 'ไม่ผ่าน') {
-      const ans = prompt('เหตุผลที่รูปไม่ผ่าน (ส่งให้นักศึกษาทางอีเมล)\nพิมพ์เลขข้อ หรือพิมพ์ข้อความเอง\n\n' +
+      const ans = prompt('เหตุผลที่รูปไม่ผ่าน (นักศึกษาจะเห็นเหตุผลที่หน้าลงทะเบียน)\nพิมพ์เลขข้อ หรือพิมพ์ข้อความเอง\n\n' +
         REASONS.map((t, i) => (i + 1) + '. ' + t).join('\n'), '1');
       if (ans === null) return;
       reason = REASONS[Number(ans.trim()) - 1] || ans.trim();
