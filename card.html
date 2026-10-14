@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>การ์ดนักศึกษา / ตรวจรูป</title>
+<!-- ส่งคำขอไป Apps Script แทน google.script.run -->
+<script src="api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --navy:#1f3b6e; --gold:#f2b705; --bg:#f4f6fa; --line:#d9dee8; --ok:#1a7f4b; --err:#b42318; --warn:#b54708; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); font-family:'Sarabun',sans-serif; color:#1b1f29; }
+  header { background:var(--navy); color:#fff; padding:14px 16px; border-bottom:4px solid var(--gold);
+    display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  header h1 { margin:0; font-size:18px; }
+  header small { opacity:.85; font-size:13px; }
+  main { max-width:480px; margin:0 auto; padding:16px; }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; }
+  input { width:100%; padding:11px 12px; font:inherit; font-size:16px; border:1px solid var(--line); border-radius:8px; }
+  .row { display:flex; gap:8px; } .row input { flex:1; }
+  button { padding:11px 14px; font:inherit; font-size:15px; font-weight:700; color:#fff; background:var(--navy);
+    border:0; border-radius:8px; cursor:pointer; }
+  button.ok { background:var(--ok); } button.bad { background:var(--err); } button.ghost { background:#fff; color:var(--navy); border:1px solid var(--navy); }
+  button:disabled { opacity:.5; }
+  .msg { margin-top:10px; font-size:14px; } .msg.err { color:var(--err); }
+  .stu { text-align:center; }
+  .stu img, .stu .nophoto { width:200px; height:250px; object-fit:cover; border-radius:12px; border:3px solid var(--line);
+    background:#eef1f6; margin:0 auto 12px; display:flex; align-items:center; justify-content:center; color:#5b6475; }
+  .stu h2 { margin:0; font-size:22px; }
+  .stu .id { font-size:18px; letter-spacing:1px; color:#5b6475; margin:2px 0 12px; }
+  .stu dl { display:grid; grid-template-columns:auto 1fr; gap:6px 10px; text-align:left; font-size:15px; margin:0; }
+  .stu dt { color:#5b6475; } .stu dd { margin:0; font-weight:600; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:99px; font-size:13px; font-weight:600; }
+  .b-ok { background:#e3f4ea; color:var(--ok); } .b-wait { background:#fff3e0; color:var(--warn); } .b-bad { background:#fdecea; color:var(--err); }
+  .admin { display:flex; gap:8px; margin-top:14px; } .admin button { flex:1; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>การ์ดนักศึกษา</h1><small id="who">ผู้ตรวจ / แอดมิน</small></div>
+  <button class="ghost hidden" id="btnOut" style="background:transparent;color:#fff;border-color:#fff">ออก</button>
+</header>
+<main>
+  <section class="panel" id="login">
+    <label for="key" style="font-weight:600">PIN ผู้ตรวจ หรือ ADMIN_KEY</label>
+    <div class="row" style="margin-top:6px">
+      <input id="key" type="password" autocomplete="off">
+      <button id="btnIn">เข้าสู่ระบบ</button>
+    </div>
+    <div class="msg" id="msgIn"></div>
+  </section>
+
+  <section class="hidden" id="app">
+    <div class="panel">
+      <div class="row">
+        <input id="sid" type="tel" inputmode="numeric" placeholder="รหัสนักศึกษา">
+        <button id="btnFind">ค้นหา</button>
+      </div>
+      <button class="ghost hidden" id="btnPending" style="width:100%;margin-top:8px">ไล่ตรวจรูปที่รออนุมัติ</button>
+      <div class="msg" id="msgFind"></div>
+    </div>
+
+    <div class="panel stu hidden" id="result">
+      <img id="rPhoto" alt="">
+      <div class="nophoto hidden" id="rNoPhoto">ยังไม่มีรูปถ่าย</div>
+      <h2 id="rName"></h2>
+      <div class="id" id="rId"></div>
+      <dl>
+        <dt>ชั้นปี / ห้อง</dt><dd id="rClass"></dd>
+        <dt>อาจารย์ที่ปรึกษา</dt><dd id="rAdvisor"></dd>
+        <dt>ชื่อเล่น</dt><dd id="rNick"></dd>
+        <dt class="adm">อีเมล</dt><dd class="adm" id="rEmail"></dd>
+        <dt class="adm">เบอร์มือถือ</dt><dd class="adm" id="rPhone"></dd>
+        <dt>สถานะรูป</dt><dd><span class="badge" id="rStatus"></span></dd>
+      </dl>
+      <div class="admin hidden" id="adminBtns">
+        <button class="ok" data-s="อนุมัติ">อนุมัติรูป</button>
+        <button class="bad" data-s="ไม่ผ่าน">ไม่ผ่าน</button>
+      </div>
+      <div class="admin hidden" id="qrBox">
+        <button class="ghost" id="btnResetQr">รีเซ็ต QR (นักศึกษาเปลี่ยนมือถือ)</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let KEY = '', ROLE = '', queue = [];
+
+  function store(k, v) { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+  function err(el, t) { el.textContent = t; el.className = 'msg err'; }
+  function badge(s) {
+    const el = $('rStatus'); el.textContent = s;
+    el.className = 'badge ' + (s === 'อนุมัติ' ? 'b-ok' : s === 'รอตรวจ' ? 'b-wait' : 'b-bad');
+  }
+
+  function login(k) {
+    google.script.run.withSuccessHandler(r => {
+      if (!r.ok) { store('ck', null); return err($('msgIn'), r.msg); }
+      KEY = k; ROLE = r.role; store('ck', k);
+      $('who').textContent = (r.role === 'admin' ? 'แอดมิน' : 'ผู้ตรวจ: ' + r.name);
+      $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('btnOut').classList.remove('hidden');
+      $('btnPending').classList.toggle('hidden', ROLE !== 'admin');
+      $('sid').focus();
+    }).withFailureHandler(e => err($('msgIn'), e.message)).checkKey(k);
+  }
+
+  function find(id) {
+    $('msgFind').textContent = 'กำลังค้นหา…'; $('msgFind').className = 'msg';
+    google.script.run.withSuccessHandler(r => {
+      if (!r.ok) { $('result').classList.add('hidden'); return err($('msgFind'), r.msg); }
+      $('msgFind').textContent = queue.length ? 'เหลือรอตรวจอีก ' + queue.length + ' คน' : '';
+      $('rPhoto').classList.toggle('hidden', !r.photo); $('rNoPhoto').classList.toggle('hidden', !!r.photo);
+      if (r.photo) $('rPhoto').src = r.photo;
+      $('rName').textContent = r.fullName; $('rId').textContent = r.id;
+      $('rClass').textContent = 'ปี ' + r.year + ' / ห้อง ' + r.room;
+      $('rAdvisor').textContent = r.advisor || '-';
+      document.querySelectorAll('.adm').forEach(el => el.classList.toggle('hidden', ROLE !== 'admin'));
+      $('rEmail').textContent = r.email || '-';
+      $('rNick').textContent = r.nickname || '-';
+      $('rPhone').textContent = r.phone || '-';
+      badge(r.photoStatus);
+      $('adminBtns').classList.toggle('hidden', !(ROLE === 'admin' && r.photo));
+      $('qrBox').classList.toggle('hidden', ROLE !== 'admin');
+      $('result').classList.remove('hidden'); $('result').dataset.id = r.id;
+    }).withFailureHandler(e => err($('msgFind'), e.message)).getStudentCard(KEY, id);
+  }
+
+  $('btnIn').onclick = () => { const k = $('key').value.trim(); if (k) login(k); };
+  $('key').onkeydown = e => { if (e.key === 'Enter') $('btnIn').click(); };
+  $('btnFind').onclick = () => { queue = []; const id = $('sid').value.trim(); if (id) find(id); };
+  $('sid').onkeydown = e => { if (e.key === 'Enter') $('btnFind').click(); };
+  $('btnOut').onclick = () => { store('ck', null); location.reload(); };
+
+  $('btnPending').onclick = () => {
+    google.script.run.withSuccessHandler(r => {
+      if (!r.ok) return err($('msgFind'), r.msg);
+      queue = r.ids;
+      if (!queue.length) { $('msgFind').textContent = 'ไม่มีรูปรอตรวจ'; $('msgFind').className = 'msg'; return; }
+      find(queue.shift());
+    }).listPendingPhotos(KEY);
+  };
+
+  // เหตุผลที่ใช้บ่อย (ตามประกาศข้อ 4) — พิมพ์เลขข้อ หรือพิมพ์ข้อความเองก็ได้
+  const REASONS = [
+    'ไม่ได้แต่งกายสุภาพ (ใส่ชุดวอร์ม เสื้อกีฬา เสื้อยืด หรือเสื้อกล้าม)',
+    'ใบหน้าไม่ชัด เบลอ มืด หรือย้อนแสง',
+    'สวมหมวก แว่นกันแดด หรือหน้ากากอนามัย',
+    'ไม่ใช่ภาพหน้าตรงครึ่งตัว หรือใบหน้าไม่อยู่กลางภาพ',
+    'ใช้ฟิลเตอร์/แอปแต่งหน้า หรือเป็นภาพถ่ายจากหน้าจอ/บัตร/AI',
+    'ไม่ใช่รูปของนักศึกษาเอง หรือมีบุคคลอื่นในภาพ'
+  ];
+  $('adminBtns').onclick = e => {
+    const s = e.target.dataset.s; if (!s) return;
+    let reason = '';
+    if (s === 'ไม่ผ่าน') {
+      const ans = prompt('เหตุผลที่รูปไม่ผ่าน (ส่งให้นักศึกษาทางอีเมล)\nพิมพ์เลขข้อ หรือพิมพ์ข้อความเอง\n\n' +
+        REASONS.map((t, i) => (i + 1) + '. ' + t).join('\n'), '1');
+      if (ans === null) return;
+      reason = REASONS[Number(ans.trim()) - 1] || ans.trim();
+      if (!reason) return alert('กรุณาระบุเหตุผล');
+    }
+    $('adminBtns').querySelectorAll('button').forEach(b => b.disabled = true);
+    google.script.run.withSuccessHandler(r => {
+      $('adminBtns').querySelectorAll('button').forEach(b => b.disabled = false);
+      if (!r.ok) return err($('msgFind'), r.msg);
+      badge(r.photoStatus);
+      $('msgFind').textContent = r.photoStatus + ' · ' + (r.mail || ''); $('msgFind').className = 'msg';
+      if (queue.length) setTimeout(() => find(queue.shift()), 600);
+    }).withFailureHandler(x => {
+      $('adminBtns').querySelectorAll('button').forEach(b => b.disabled = false);
+      err($('msgFind'), x.message);
+    }).setPhotoStatus(KEY, $('result').dataset.id, s, reason);
+  };
+
+  $('btnResetQr').onclick = () => {
+    const id = $('result').dataset.id;
+    if (!confirm('รีเซ็ต QR ของ ' + id + '?\nQR บนมือถือเครื่องเดิมจะใช้ไม่ได้ทันที')) return;
+    google.script.run.withSuccessHandler(r => alert(r.msg)).withFailureHandler(e => alert(e.message)).adminResetQr(KEY, id);
+  };
+
+  const saved = load('ck'); if (saved) login(saved);
+</script>
+</body>
+</html>

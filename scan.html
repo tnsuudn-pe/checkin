@@ -286,8 +286,22 @@
     $('result').innerHTML = html;
     const n = $('btnNext'); if (n) n.onclick = resume;
     const bad = $('btnBad'); if (bad) bad.onclick = () => {
-      // ไม่ต้องยืนยัน — กดผิดก็แค่ให้หัวหน้างานตรวจ ไม่มีข้อมูลหาย
-      clearTimeout(timer); bad.disabled = true; bad.textContent = '⏳ กำลังแจ้ง…';
+      // แตะสองครั้งเพื่อยืนยัน (กันนิ้วโดนพลาด) — แตะแรกหยุดนับถอยหลังไว้ ถ้าไม่แตะซ้ำใน 3 วิ ปุ่มกลับเป็นเหมือนเดิม
+      clearTimeout(timer);
+      if (!bad.dataset.armed) {
+        bad.dataset.armed = '1';
+        bad.textContent = '⚠️ แตะอีกครั้งเพื่อยืนยัน';
+        bad.style.background = 'var(--err)'; bad.style.color = '#fff';
+        beep(660, 80);
+        bad._t = setTimeout(() => {
+          delete bad.dataset.armed;
+          bad.textContent = '🚫 หน้าไม่ตรง'; bad.style.background = ''; bad.style.color = '';
+          timer = setTimeout(resume, 3000);
+        }, 3000);
+        return;
+      }
+      clearTimeout(bad._t);
+      bad.disabled = true; bad.textContent = '⏳ กำลังแจ้ง…';
       const row = +bad.dataset.row;
       run('flagMismatch', [KEY, row], x => {
         if (!x.ok) { bad.textContent = x.msg; return; }
