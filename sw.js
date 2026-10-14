@@ -1,6 +1,6 @@
 // เก็บหน้าเว็บและไลบรารีไว้ในเครื่อง: ใช้ของในเครื่องก่อน แล้วอัปเดตเบื้องหลังเมื่อมีเน็ต
 // คำขอ POST (ส่งข้อมูลเข้าระบบ) ไม่ถูกเก็บ
-const CACHE = 'pe-checkin-v1';
+const CACHE = 'pe-checkin-v2';
 const CORE = ['./', './index.html', './myqr.html', './scan.html', './api.js'];
 
 self.addEventListener('install', e => {
