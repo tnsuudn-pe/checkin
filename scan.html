@@ -20,7 +20,7 @@
   input, select { width:100%; padding:11px; font:inherit; font-size:16px; border:1px solid var(--line); border-radius:8px; background:#fff; }
   .row { display:flex; gap:8px; } .row > input { flex:1; }
   .btn { padding:11px 14px; font:inherit; font-size:15px; font-weight:700; color:#fff; background:var(--navy); border:0; border-radius:8px; }
-  .btn.g { background:#7a5af5; } .btn.next { background:var(--ok); flex:1; }
+  .btn.g { background:#7a5af5; } .btn.next { background:var(--ok); flex:1; } .btn.bad { background:#fff; color:var(--err); border:2px solid var(--err); }
   .msg { font-size:14px; color:var(--err); margin-top:8px; white-space:pre-line; }
   .cam { position:relative; border-radius:12px; overflow:hidden; background:#000; height:52vh; }
   .cam video { width:100%; height:100%; object-fit:cover; display:block; }
@@ -274,7 +274,7 @@
       html = '<div class="result ok"><h2>✅ เช็คชื่อแล้ว · ตรวจหน้าให้ตรงรูป</h2>' + cardHtml(r.card) +
         (r.flags && r.flags.length ? '<div class="flags">⚑ ' + esc(r.flags.join(', ')) + '</div>' : '') +
         '<div class="hint" id="photoState"></div>' +
-        '<div class="acts"><button class="btn g" id="btnG" data-row="' + r.row + '">⭐ ให้ G</button><button class="btn next" id="btnNext">ถัดไป ▶</button></div></div>';
+        '<div class="acts"><button class="btn bad" id="btnBad" data-row="' + r.row + '">🚫 หน้าไม่ตรง</button><button class="btn g" id="btnG" data-row="' + r.row + '">⭐ G</button><button class="btn next" id="btnNext">ถัดไป ▶</button></div></div>';
       if (r.needPhoto && SNAP_MODE) {
         // โหมดถ่ายภาพ: ต้องถ่ายรูปหน้าก่อนไปคนถัดไป (ไม่ตั้งเวลาข้ามให้)
         pendingRow = r.row; $('faceLabel').classList.remove('hidden');
@@ -285,6 +285,18 @@
     }
     $('result').innerHTML = html;
     const n = $('btnNext'); if (n) n.onclick = resume;
+    const bad = $('btnBad'); if (bad) bad.onclick = () => {
+      // ไม่ต้องยืนยัน — กดผิดก็แค่ให้หัวหน้างานตรวจ ไม่มีข้อมูลหาย
+      clearTimeout(timer); bad.disabled = true; bad.textContent = '⏳ กำลังแจ้ง…';
+      const row = +bad.dataset.row;
+      run('flagMismatch', [KEY, row], x => {
+        if (!x.ok) { bad.textContent = x.msg; return; }
+        bad.textContent = '🚫 แจ้งแล้ว — รอหัวหน้างานตรวจ';
+        pop('bad', 'แจ้งหน้าไม่ตรงแล้ว', 'ถ่ายรูปคนที่ถือมือถือเป็นหลักฐาน');
+        if (SNAP_MODE) { pendingRow = row; $('faceLabel').classList.remove('hidden'); }
+        else { setTimeout(() => lookAndSnap(row), 1200); timer = setTimeout(resume, 9000); }
+      }, m => { bad.disabled = false; bad.textContent = '🚫 ลองอีกครั้ง: ' + m; });
+    };
     const g = $('btnG'); if (g) g.onclick = () => {
       clearTimeout(timer); g.disabled = true;
       run('setScanEval', [KEY, +g.dataset.row, 'G'], x => { g.textContent = x.ok ? '⭐ บันทึก G แล้ว' : x.msg; timer = setTimeout(resume, 2500); });

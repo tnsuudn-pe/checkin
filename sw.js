@@ -2,7 +2,7 @@
 // - มีเน็ต: โหลดจากเซิร์ฟเวอร์ก่อนเสมอ (ได้หน้าล่าสุดทันทีที่แก้) แล้วเก็บสำเนาไว้
 // - ไม่มีเน็ต: ใช้สำเนาในเครื่อง
 // คำขอ POST (ส่งข้อมูลเข้าระบบ) ไม่ถูกเก็บ
-const CACHE = 'pe-checkin-v4';
+const CACHE = 'pe-checkin-v5';
 const CORE = ['./', './index.html', './myqr.html', './scan.html', './api.js'];
 
 self.addEventListener('install', e => {
