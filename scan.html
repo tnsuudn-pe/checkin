@@ -29,6 +29,10 @@
   .look { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; color:#fff; background:rgba(122,90,245,.55); font-size:24px; font-weight:700; text-align:center; padding:20px; text-shadow:0 2px 6px rgba(0,0,0,.6); }
   .look b { font-size:110px; line-height:1; }
   .look small { font-size:17px; font-weight:600; }
+  .pop { position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:#fff; font-weight:800; text-align:center; pointer-events:none; animation:popin .18s ease-out; }
+  .pop b { font-size:120px; line-height:1; } .pop span { font-size:30px; } .pop small { font-size:18px; font-weight:600; max-width:90%; }
+  .pop.ok { background:rgba(26,127,75,.93); } .pop.dup { background:rgba(181,71,8,.93); } .pop.bad { background:rgba(180,35,24,.94); }
+  @keyframes popin { from { transform:scale(.85); opacity:0; } to { transform:none; opacity:1; } }
   .flash { position:fixed; inset:0; z-index:45; background:#fff; opacity:.9; pointer-events:none; }
   #result { position:fixed; left:0; right:0; bottom:0; z-index:30; padding:0 10px 10px; max-height:62vh; overflow:auto; }
   .result { border-radius:14px; padding:12px; color:#1b1f29; box-shadow:0 -6px 24px rgba(0,0,0,.35); max-width:520px; margin:0 auto; }
@@ -105,6 +109,17 @@
       o.frequency.value = freq || 880; g.gain.value = 0.25; o.connect(g); g.connect(AC.destination);
       o.start(); setTimeout(() => o.stop(), ms || 120);
     } catch (e) {}
+  }
+  /** ภาพเด้งกลางจอ + เสียง ยืนยันผลทันที (สำเร็จ / ซ้ำ / ไม่สำเร็จ) */
+  function pop(kind, title, sub) {
+    const icon = { ok: '✅', dup: '⚠️', bad: '❌' }[kind];
+    const el = document.createElement('div'); el.className = 'pop ' + kind;
+    el.innerHTML = '<b>' + icon + '</b><span>' + esc(title) + '</span>' + (sub ? '<small>' + esc(sub) + '</small>' : '');
+    document.body.appendChild(el);
+    if (kind === 'ok') { beep(880, 120); setTimeout(() => beep(1320, 200), 130); buzz(120); }
+    else if (kind === 'dup') { beep(660, 140); setTimeout(() => beep(660, 140), 200); buzz([60, 60, 60]); }
+    else { beep(200, 550); buzz([200, 100, 200]); }
+    setTimeout(() => el.remove(), kind === 'bad' ? 1600 : 1000);
   }
   function buzz(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
   function run(fn, args, ok, fail) {
@@ -247,15 +262,15 @@
   function show(r) {
     let html;
     if (!r.ok) {
-      buzz([80, 60, 80]); beep(220, 300);
+      pop('bad', 'ไม่สำเร็จ', r.msg);
       html = '<div class="result bad"><h2>❌ ไม่บันทึก</h2><div>' + esc(r.msg) + '</div></div>';
       timer = setTimeout(resume, 3500);
     } else if (r.dup) {
-      buzz([40, 40, 40]);
+      pop('dup', 'เช็คชื่อไปแล้ว', r.card && r.card.fullName);
       html = '<div class="result dup"><h2>⚠️ ' + esc(r.msg) + '</h2>' + cardHtml(r.card) + '</div>';
       timer = setTimeout(resume, 3500);
     } else {
-      buzz(120); beep(1046, 160); scanned++; $('count').textContent = 'สแกนแล้ว ' + scanned + ' คน';
+      pop('ok', 'สำเร็จ', r.card && r.card.fullName); scanned++; $('count').textContent = 'สแกนแล้ว ' + scanned + ' คน';
       html = '<div class="result ok"><h2>✅ เช็คชื่อแล้ว · ตรวจหน้าให้ตรงรูป</h2>' + cardHtml(r.card) +
         (r.flags && r.flags.length ? '<div class="flags">⚑ ' + esc(r.flags.join(', ')) + '</div>' : '') +
         '<div class="hint" id="photoState"></div>' +
