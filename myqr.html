@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR เช็คชื่อของฉัน</title>
+<!-- ส่งคำขอไป Apps Script แทน google.script.run -->
+<script src="api.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+  :root { --navy:#1f3b6e; --gold:#f2b705; --line:#d9dee8; --muted:#5b6475; --err:#b42318; --ok:#1a7f4b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:'Sarabun',Arial,sans-serif; background:#f4f6fa; color:#1b1f29; }
+  header { background:var(--navy); color:#fff; padding:14px 16px; border-bottom:4px solid var(--gold); }
+  header h1 { margin:0; font-size:18px; }
+  main { max-width:420px; margin:0 auto; padding:16px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:12px; }
+  label { display:block; font-weight:600; font-size:14px; margin:10px 0 4px; }
+  input { width:100%; padding:11px 12px; font:inherit; font-size:16px; border:1px solid var(--line); border-radius:8px; }
+  button { width:100%; margin-top:14px; padding:12px; font:inherit; font-size:16px; font-weight:700; color:#fff; background:var(--navy); border:0; border-radius:8px; }
+  button:disabled { opacity:.5; }
+  .msg { margin-top:10px; font-size:14px; color:var(--err); white-space:pre-line; }
+  .hint { font-size:13px; color:var(--muted); line-height:1.55; }
+  .who { text-align:center; }
+  .who b { font-size:19px; display:block; }
+  .who span { color:var(--muted); }
+  #qr { display:flex; justify-content:center; margin:14px 0 8px; }
+  #qr svg { width:100%; max-width:300px; height:auto; }
+  .bar { height:8px; background:#e6eaf2; border-radius:4px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--ok); transition:width 1s linear; }
+  .live { display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:14px; }
+  .live .clock { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--navy); }
+  .dot { width:12px; height:12px; border-radius:50%; background:var(--ok); animation:pulse 1s infinite; display:inline-block; vertical-align:middle; }
+  @keyframes pulse { 50% { opacity:.2; } }
+  .net { font-size:12px; color:var(--muted); text-align:center; margin-top:6px; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<header><h1>QR เช็คชื่อของฉัน · คณะพลศึกษา</h1></header>
+<main>
+  <section class="card hidden" id="setup">
+    <p class="hint">เปิดใช้ครั้งแรกบน<b>มือถือของตัวเอง</b>เท่านั้น — QR จะผูกกับมือถือเครื่องนี้ ใช้เครื่องอื่นต้องให้เจ้าหน้าที่รีเซ็ต</p>
+    <label for="sid">รหัสนักศึกษา</label>
+    <input id="sid" type="tel" inputmode="numeric" autocomplete="off">
+    <label for="lname">นามสกุล (ตามทะเบียน)</label>
+    <input id="lname" type="text" autocomplete="off">
+    <button id="btnOn">เปิดใช้ QR บนมือถือเครื่องนี้</button>
+    <div class="msg" id="msg"></div>
+  </section>
+
+  <section class="card hidden" id="show">
+    <div class="who"><b id="vName"></b><span id="vInfo"></span></div>
+    <div id="qr"></div>
+    <div class="bar"><i id="bar" style="width:100%"></i></div>
+    <div class="live"><span><span class="dot"></span> QR เปลี่ยนใน <b id="left">30</b> วิ</span><span class="clock" id="clock"></span></div>
+    <p class="hint" style="margin:10px 0 0">ยื่นหน้าจอนี้ให้ผู้ตรวจสแกน · <b>ภาพหน้าจอ (screenshot) ใช้ไม่ได้</b> เพราะ QR หมดอายุภายใน 1 นาที</p>
+    <div class="net" id="net"></div>
+  </section>
+
+  <section class="card hint">
+    💡 ไม่มีอินเทอร์เน็ตตอนเข้าแถวก็ได้ — เปิดหน้านี้<b>ค้างไว้</b>ก่อนออกจากที่พัก QR จะเปลี่ยนเองตามนาฬิกา
+    แต่ถ้าปิดหน้าไปแล้วต้องมีเน็ตเพื่อเปิดใหม่
+  </section>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const STORE = 'pe_myqr_v1';
+  let REC = null, lastStep = -1;
+
+  function save(r) { try { localStorage.setItem(STORE, JSON.stringify(r)); } catch (e) {} }
+  function loadRec() { try { return JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) { return null; } }
+  const now = () => Date.now() + (REC && REC.offset || 0);   // ชดเชยนาฬิกามือถือที่คลาด
+
+  function hexBytes(hex) { const a = new Uint8Array(hex.length / 2); for (let i = 0; i < a.length; i++) a[i] = parseInt(hex.substr(i * 2, 2), 16); return a; }
+
+  /** RFC 6238 TOTP (HMAC-SHA1, 6 หลัก) — ต้องตรงกับ totpAt_() ใน Code.gs */
+  async function totp(hex, step) {
+    const msg = new Uint8Array(8);
+    let s = step;
+    for (let i = 7; i >= 0; i--) { msg[i] = s & 255; s = Math.floor(s / 256); }
+    const key = await crypto.subtle.importKey('raw', hexBytes(hex), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+    const h = new Uint8Array(await crypto.subtle.sign('HMAC', key, msg));
+    const o = h[19] & 15;
+    const bin = ((h[o] & 127) << 24) | (h[o + 1] << 16) | (h[o + 2] << 8) | h[o + 3];
+    return String(bin % 1000000).padStart(6, '0');
+  }
+
+  async function tick() {
+    const t = now(), stepMs = REC.step * 1000, step = Math.floor(t / stepMs);
+    const left = Math.ceil((stepMs - (t % stepMs)) / 1000);
+    $('left').textContent = left;
+    $('bar').style.width = (left / REC.step * 100) + '%';
+    $('clock').textContent = new Date(t).toLocaleTimeString('th-TH', { hour12: false });
+    if (step !== lastStep) {
+      lastStep = step;
+      const code = await totp(REC.secret, step);
+      const qr = qrcode(0, 'M');
+      qr.addData('PE1.' + REC.id + '.' + code);
+      qr.make();
+      $('qr').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
+    }
+  }
+
+  function syncClock() {
+    const sent = Date.now();
+    google.script.run.withSuccessHandler(server => {
+      const rtt = Date.now() - sent;
+      REC.offset = server + rtt / 2 - Date.now();
+      save(REC);
+      $('net').textContent = 'ซิงก์เวลากับระบบแล้ว ✓';
+    }).withFailureHandler(() => { $('net').textContent = 'ออฟไลน์ — ใช้นาฬิกาในมือถือ'; }).qrClock();
+  }
+
+  async function keepAwake() { try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) {} }
+
+  function showQr() {
+    $('setup').classList.add('hidden'); $('show').classList.remove('hidden');
+    $('vName').textContent = REC.name;
+    $('vInfo').textContent = REC.id + ' · ปี ' + REC.year + ' ห้อง ' + REC.room;
+    tick(); setInterval(tick, 1000);
+    syncClock(); keepAwake();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { keepAwake(); syncClock(); } });
+  }
+
+  $('btnOn').onclick = () => {
+    const id = $('sid').value.trim(), ln = $('lname').value.trim();
+    if (!id || !ln) { $('msg').textContent = 'กรุณากรอกรหัสนักศึกษาและนามสกุล'; return; }
+    $('btnOn').disabled = true; $('msg').textContent = '';
+    google.script.run.withSuccessHandler(r => {
+      $('btnOn').disabled = false;
+      if (!r.ok) { $('msg').textContent = r.msg; return; }
+      REC = { id: r.id, name: r.name, year: r.year, room: r.room, secret: r.secret, step: r.step, offset: r.serverTime - Date.now() };
+      save(REC);
+      if (!loadRec()) $('msg').textContent = 'เบราว์เซอร์นี้บันทึกข้อมูลไม่ได้ (โหมดไม่ระบุตัวตน?) กรุณาเปิดด้วยเบราว์เซอร์ปกติ';
+      showQr();
+    }).withFailureHandler(e => { $('btnOn').disabled = false; $('msg').textContent = e.message; }).qrActivate(id, ln);
+  };
+
+  REC = loadRec();
+  if (REC && REC.secret) showQr(); else $('setup').classList.remove('hidden');
+</script>
+</body>
+</html>

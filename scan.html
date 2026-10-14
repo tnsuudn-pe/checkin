@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สแกนเช็คชื่อ (ผู้ตรวจ)</title>
+<!-- ส่งคำขอไป Apps Script แทน google.script.run -->
+<script src="api.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+  :root { --navy:#1f3b6e; --gold:#f2b705; --line:#d9dee8; --muted:#5b6475; --ok:#1a7f4b; --warn:#b54708; --err:#b42318; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:'Sarabun',Arial,sans-serif; background:#0f1626; color:#1b1f29; }
+  header { background:var(--navy); color:#fff; padding:10px 14px; border-bottom:3px solid var(--gold); display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  header b { font-size:15px; } header small { opacity:.85; font-size:12px; display:block; }
+  header button { background:transparent; border:1px solid #fff; color:#fff; padding:4px 10px; border-radius:6px; font:inherit; font-size:13px; }
+  main { max-width:520px; margin:0 auto; padding:12px; }
+  .panel { background:#fff; border-radius:12px; padding:14px; margin-bottom:10px; }
+  label { display:block; font-weight:600; font-size:14px; margin-bottom:6px; }
+  input, select { width:100%; padding:11px; font:inherit; font-size:16px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  .row { display:flex; gap:8px; } .row > input { flex:1; }
+  .btn { padding:11px 14px; font:inherit; font-size:15px; font-weight:700; color:#fff; background:var(--navy); border:0; border-radius:8px; }
+  .btn.g { background:#7a5af5; } .btn.next { background:var(--ok); flex:1; }
+  .msg { font-size:14px; color:var(--err); margin-top:8px; white-space:pre-line; }
+  .cam { position:relative; border-radius:12px; overflow:hidden; background:#000; aspect-ratio:3/4; }
+  .cam video { width:100%; height:100%; object-fit:cover; display:block; }
+  .frame { position:absolute; inset:18% 14%; border:3px solid rgba(255,255,255,.85); border-radius:14px; }
+  .count { position:absolute; top:8px; left:8px; background:rgba(0,0,0,.6); color:#fff; padding:3px 9px; border-radius:99px; font-size:13px; }
+  .look { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; color:#fff; background:rgba(0,0,0,.35); font-size:22px; font-weight:700; text-align:center; }
+  .look b { font-size:64px; }
+  .result { border-radius:12px; padding:12px; margin-top:10px; color:#1b1f29; }
+  .result.ok { background:#e3f4ea; border:2px solid var(--ok); }
+  .result.dup { background:#fff3e0; border:2px solid var(--warn); }
+  .result.bad { background:#fdecea; border:2px solid var(--err); }
+  .result h2 { margin:0 0 6px; font-size:18px; }
+  .stu { display:flex; gap:12px; align-items:center; }
+  .stu img, .stu .nop { width:96px; height:120px; object-fit:cover; border-radius:10px; background:#eef1f6; flex:none; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--muted); text-align:center; }
+  .stu .name { font-size:18px; font-weight:700; }
+  .stu .meta { color:var(--muted); font-size:14px; }
+  .flags { color:var(--warn); font-size:13px; margin-top:4px; }
+  .acts { display:flex; gap:8px; margin-top:10px; }
+  .hint { color:var(--muted); font-size:13px; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div><b>สแกนเช็คชื่อ</b><small id="who">ผู้ตรวจ</small></div>
+  <button id="btnOut" class="hidden">ออก</button>
+</header>
+<main>
+  <section class="panel" id="login">
+    <label for="pin">PIN ผู้ตรวจ</label>
+    <div class="row"><input id="pin" type="password" inputmode="numeric" autocomplete="off"><button class="btn" id="btnIn">เข้า</button></div>
+    <div class="msg" id="msgIn"></div>
+  </section>
+
+  <section class="panel hidden" id="pick">
+    <label for="act">กิจกรรมที่เปิดเช็คชื่อวันนี้</label>
+    <div class="row"><select id="act"></select><button class="btn" id="btnReload" title="โหลดรายการใหม่">⟳</button></div>
+    <p class="hint" id="noAct"></p>
+    <div class="hidden" id="manualBox" style="margin-top:10px">
+      <label for="manual">แอดมิน: พิมพ์รหัสนักศึกษา (ถ่ายรูปทุกครั้ง)</label>
+      <div class="row"><input id="manual" type="tel" inputmode="numeric"><button class="btn" id="btnManual">บันทึก</button></div>
+    </div>
+  </section>
+
+  <section class="hidden" id="scanArea">
+    <div class="cam">
+      <video id="video" playsinline muted></video>
+      <div class="frame"></div>
+      <div class="count" id="count">สแกนแล้ว 0 คน</div>
+      <div class="look hidden" id="look"><span>📸 ให้นักศึกษามองกล้อง</span><b id="lookN">2</b></div>
+    </div>
+    <div class="msg" id="camMsg" style="color:#fff"></div>
+    <!-- หน้าเว็บ Apps Script ไม่ได้รับสิทธิ์กล้องแบบสด — ใช้แอปกล้องของมือถือถ่ายแล้วอ่าน QR จากภาพแทน -->
+    <div class="hidden" id="snapBox">
+      <label class="btn next" for="qrFile" style="display:block;text-align:center;font-size:20px;padding:22px">📷 ถ่าย QR นักศึกษา</label>
+      <input class="hidden" id="qrFile" type="file" accept="image/*" capture="environment">
+      <label class="btn g hidden" id="faceLabel" for="faceFile" style="display:block;text-align:center;font-size:18px;padding:16px;margin-top:8px">📸 ถ่ายรูปหน้านักศึกษา (สุ่มตรวจ)</label>
+      <input class="hidden" id="faceFile" type="file" accept="image/*" capture="environment">
+    </div>
+    <div id="result"></div>
+  </section>
+</main>
+<canvas id="cv" class="hidden"></canvas>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let KEY = '', ROLE = '', stream = null, busy = false, lastText = '', lastAt = 0, scanned = 0, timer = null;
+
+  function store(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  function buzz(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
+  function run(fn, args, ok, fail) {
+    google.script.run.withSuccessHandler(ok).withFailureHandler(e => (fail || (m => alert(m)))(e.message))[fn].apply(null, args);
+  }
+
+  // ---------- เข้าระบบ / เลือกกิจกรรม
+  function login(pin) {
+    $('msgIn').textContent = 'กำลังตรวจสอบ…';
+    run('scanInit', [pin], r => {
+      if (!r.ok) { store('scan_pin', null); $('msgIn').textContent = r.msg; return; }
+      KEY = pin; ROLE = r.role; store('scan_pin', pin);
+      $('who').textContent = (r.role === 'admin' ? 'แอดมิน' : 'ผู้ตรวจ: ' + r.name);
+      $('login').classList.add('hidden'); $('pick').classList.remove('hidden'); $('btnOut').classList.remove('hidden');
+      $('manualBox').classList.toggle('hidden', ROLE !== 'admin');
+      $('act').innerHTML = r.acts.map(a => '<option value="' + esc(a.code) + '">' + esc(a.name) + ' (ปี ' + esc(a.years) + ')</option>').join('');
+      $('noAct').textContent = r.acts.length ? '' : 'ยังไม่มีกิจกรรมที่เปิดเช็คชื่อวันนี้ — ให้หัวหน้างานกด "เปิดเช็คชื่อ" ในชีต แล้วกด ⟳';
+      if (r.acts.length) startCam(); else stopCam();
+    }, m => { $('msgIn').textContent = m; });
+  }
+  $('btnIn').onclick = () => { const p = $('pin').value.trim(); if (p) login(p); };
+  $('pin').onkeydown = e => { if (e.key === 'Enter') $('btnIn').click(); };
+  $('btnReload').onclick = () => login(KEY);
+  $('btnOut').onclick = () => { store('scan_pin', null); stopCam(); location.reload(); };
+
+  // ---------- กล้อง + อ่าน QR
+  async function startCam() {
+    $('scanArea').classList.remove('hidden');
+    if (stream) return;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 960 } }, audio: false });
+      $('video').srcObject = stream; await $('video').play();
+      $('camMsg').textContent = '';
+      requestAnimationFrame(loop);
+    } catch (e) {
+      SNAP_MODE = true;
+      document.querySelector('.cam').classList.add('hidden');
+      $('snapBox').classList.remove('hidden');
+    }
+  }
+
+  // ---------- โหมดถ่ายภาพ (ใช้เมื่อเปิดกล้องสดไม่ได้)
+  let SNAP_MODE = false, pendingRow = 0;
+  function fileToCanvas(file, maxW) {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => {
+        const s = Math.min(1, maxW / Math.max(img.width, img.height));
+        const cv = $('cv'); cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+        cv.getContext('2d', { willReadFrequently: true }).drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(img.src); res(cv);
+      };
+      img.onerror = () => rej(new Error('อ่านรูปไม่ได้'));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  $('qrFile').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f || busy) return;
+    busy = true;
+    $('result').innerHTML = '<div class="result dup"><h2>⏳ กำลังอ่าน QR…</h2></div>';
+    try {
+      let code = null;
+      for (const w of [1000, 1600, 700]) {        // ลองหลายขนาด เพิ่มโอกาสอ่านติด
+        const cv = await fileToCanvas(f, w);
+        code = jsQR(cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height);
+        if (code && code.data) break;
+      }
+      if (!code || !code.data) { show({ ok: false, msg: 'อ่าน QR จากภาพไม่ได้ ถ่ายใหม่ให้ QR อยู่กลางภาพและชัดขึ้น' }); return; }
+      submit(code.data, '');
+    } catch (err) { show({ ok: false, msg: err.message }); }
+  };
+  $('faceFile').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f || !pendingRow) return;
+    const cv = await fileToCanvas(f, 320);
+    const row = pendingRow; pendingRow = 0;
+    $('faceLabel').classList.add('hidden');
+    const st = $('photoState'); if (st) st.textContent = '📸 กำลังส่งรูป…';
+    run('uploadScanPhoto', [KEY, row, cv.toDataURL('image/jpeg', 0.6)], r => {
+      const s = $('photoState'); if (s) s.textContent = r.ok ? '📸 บันทึกรูปแล้ว' : '📸 ' + r.msg;
+      timer = setTimeout(resume, 2500);
+    }, m => { const s = $('photoState'); if (s) s.textContent = '📸 ส่งรูปไม่สำเร็จ: ' + m; });
+  };
+  function stopCam() { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } }
+
+  let lastDecode = 0;
+  function loop(t) {
+    if (!stream) return;
+    requestAnimationFrame(loop);
+    if (busy || t - lastDecode < 180) return;
+    lastDecode = t;
+    const v = $('video'); if (!v.videoWidth) return;
+    const w = 480, h = Math.round(v.videoHeight * w / v.videoWidth), cv = $('cv');
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(v, 0, 0, w, h);
+    const code = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
+    if (!code || !code.data) return;
+    if (code.data === lastText && Date.now() - lastAt < 4000) return;   // QR เดิมยังอยู่หน้ากล้อง
+    lastText = code.data; lastAt = Date.now();
+    submit(code.data, '');
+  }
+
+  /** ถ่ายภาพจากกล้องตัวเดียวกัน ย่อเหลือกว้าง 320px (~15–20 KB) */
+  function snap() {
+    const v = $('video'), w = 320, h = Math.round(v.videoHeight * w / v.videoWidth), cv = $('cv');
+    cv.width = w; cv.height = h; cv.getContext('2d').drawImage(v, 0, 0, w, h);
+    return cv.toDataURL('image/jpeg', 0.6);
+  }
+
+  function lookAndSnap(row) {
+    let n = 2; $('lookN').textContent = n; $('look').classList.remove('hidden');
+    const iv = setInterval(() => {
+      n--; $('lookN').textContent = n;
+      if (n > 0) return;
+      clearInterval(iv); $('look').classList.add('hidden');
+      const img = snap(); buzz(60);
+      const st = $('photoState'); if (st) st.textContent = '📸 กำลังส่งรูป…';
+      run('uploadScanPhoto', [KEY, row, img], r => {
+        const s = $('photoState'); if (s) s.textContent = r.ok ? '📸 บันทึกรูปแล้ว' : '📸 ' + r.msg;
+      }, m => { const s = $('photoState'); if (s) s.textContent = '📸 ส่งรูปไม่สำเร็จ: ' + m; });
+    }, 1000);
+  }
+
+  // ---------- บันทึกเช็คชื่อ
+  function submit(text, manualId) {
+    busy = true; clearTimeout(timer);
+    $('result').innerHTML = '<div class="result dup"><h2>⏳ กำลังตรวจสอบ…</h2></div>';
+    run('checkIn', [KEY, $('act').value, text, manualId], r => show(r), m => show({ ok: false, msg: m }));
+  }
+
+  function cardHtml(c) {
+    return '<div class="stu">' + (c.photo ? '<img src="' + c.photo + '" alt="">' : '<div class="nop">ยังไม่มี<br>รูปทะเบียน</div>') +
+      '<div><div class="name">' + esc(c.fullName) + '</div><div class="meta">' + esc(c.id) + '<br>ปี ' + esc(c.year) + ' ห้อง ' + esc(c.room) + '</div></div></div>';
+  }
+
+  function show(r) {
+    let html;
+    if (!r.ok) {
+      buzz([80, 60, 80]);
+      html = '<div class="result bad"><h2>❌ ไม่บันทึก</h2><div>' + esc(r.msg) + '</div></div>';
+      timer = setTimeout(resume, 3500);
+    } else if (r.dup) {
+      buzz([40, 40, 40]);
+      html = '<div class="result dup"><h2>⚠️ ' + esc(r.msg) + '</h2>' + cardHtml(r.card) + '</div>';
+      timer = setTimeout(resume, 3500);
+    } else {
+      buzz(120); scanned++; $('count').textContent = 'สแกนแล้ว ' + scanned + ' คน';
+      html = '<div class="result ok"><h2>✅ เช็คชื่อแล้ว · ตรวจหน้าให้ตรงรูป</h2>' + cardHtml(r.card) +
+        (r.flags && r.flags.length ? '<div class="flags">⚑ ' + esc(r.flags.join(', ')) + '</div>' : '') +
+        '<div class="hint" id="photoState"></div>' +
+        '<div class="acts"><button class="btn g" id="btnG" data-row="' + r.row + '">⭐ ให้ G</button><button class="btn next" id="btnNext">ถัดไป ▶</button></div></div>';
+      if (r.needPhoto && SNAP_MODE) {
+        // โหมดถ่ายภาพ: ต้องถ่ายรูปหน้าก่อนไปคนถัดไป (ไม่ตั้งเวลาข้ามให้)
+        pendingRow = r.row; $('faceLabel').classList.remove('hidden');
+      } else {
+        if (r.needPhoto) lookAndSnap(r.row);
+        timer = setTimeout(resume, r.needPhoto ? 6000 : 4000);
+      }
+    }
+    $('result').innerHTML = html;
+    const n = $('btnNext'); if (n) n.onclick = resume;
+    const g = $('btnG'); if (g) g.onclick = () => {
+      clearTimeout(timer); g.disabled = true;
+      run('setScanEval', [KEY, +g.dataset.row, 'G'], x => { g.textContent = x.ok ? '⭐ บันทึก G แล้ว' : x.msg; timer = setTimeout(resume, 2500); });
+    };
+  }
+
+  function resume() { clearTimeout(timer); busy = false; $('result').innerHTML = ''; }
+
+  $('btnManual').onclick = () => {
+    const id = $('manual').value.trim(); if (!id) return;
+    $('manual').value = ''; busy = true;
+    $('result').innerHTML = '<div class="result dup"><h2>⏳ กำลังบันทึก…</h2></div>';
+    run('checkIn', [KEY, $('act').value, '', id], r => show(r), m => show({ ok: false, msg: m }));
+  };
+
+  const saved = load('scan_pin'); if (saved) login(saved);
+</script>
+</body>
+</html>

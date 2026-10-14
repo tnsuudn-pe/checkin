@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เช็คชื่อกิจกรรม คณะพลศึกษา</title>
+<script src="api.js"></script>
+<style>
+  :root { --navy:#1f3b6e; --gold:#f2b705; --line:#d9dee8; --muted:#5b6475; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:'Sarabun',Arial,sans-serif; background:#f4f6fa; color:#1b1f29; }
+  header { background:var(--navy); color:#fff; padding:18px 16px; border-bottom:4px solid var(--gold); }
+  header h1 { margin:0; font-size:20px; } header p { margin:4px 0 0; opacity:.85; font-size:14px; }
+  main { max-width:420px; margin:0 auto; padding:16px; display:grid; gap:12px; }
+  a.big { display:block; background:#fff; border:1px solid var(--line); border-radius:14px; padding:18px; text-decoration:none; color:inherit; }
+  a.big b { font-size:19px; color:var(--navy); display:block; } a.big span { color:var(--muted); font-size:14px; }
+  .hint { color:var(--muted); font-size:13px; line-height:1.55; }
+</style>
+</head>
+<body>
+<header><h1>เช็คชื่อกิจกรรม · คณะพลศึกษา</h1><p>มหาวิทยาลัยการกีฬาแห่งชาติ วิทยาเขตอุดรธานี</p></header>
+<main>
+  <a class="big" href="myqr.html"><b>🎓 QR เช็คชื่อของฉัน</b><span>สำหรับนักศึกษา — แสดง QR ให้ผู้ตรวจสแกน</span></a>
+  <a class="big" href="scan.html"><b>📷 สแกนเช็คชื่อ</b><span>สำหรับผู้ตรวจ (ต้องมี PIN)</span></a>
+  <p class="hint">💡 เพิ่มหน้านี้ไว้ที่หน้าจอหลักของมือถือ (เมนูเบราว์เซอร์ › "เพิ่มลงในหน้าจอหลัก") จะเปิดได้เร็ว และหน้า QR เปิดได้แม้ไม่มีอินเทอร์เน็ต</p>
+</main>
+</body>
+</html>
