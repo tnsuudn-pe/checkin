@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ลงทะเบียนรูปถ่ายนักศึกษา</title>
+<!-- ส่งคำขอไป Apps Script แทน google.script.run -->
+<script src="api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --navy:#1f3b6e; --gold:#f2b705; --bg:#f4f6fa; --line:#d9dee8; --ok:#1a7f4b; --err:#b42318; --muted:#5b6475; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); font-family:'Sarabun',sans-serif; color:#1b1f29; }
+  header { background:var(--navy); color:#fff; padding:18px 16px; border-bottom:4px solid var(--gold); }
+  header h1 { margin:0; font-size:20px; }
+  header p { margin:4px 0 0; font-size:14px; opacity:.85; }
+  main { max-width:480px; margin:0 auto; padding:16px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; }
+  h2 { font-size:17px; margin:0 0 12px; color:var(--navy); }
+  label { display:block; font-weight:600; font-size:14px; margin:12px 0 4px; }
+  label small { font-weight:400; color:var(--muted); }
+  input[type=text], input[type=email], input[type=tel] {
+    width:100%; padding:11px 12px; font:inherit; font-size:16px; border:1px solid var(--line); border-radius:8px; }
+  input.bad { border-color:var(--err); }
+  button { width:100%; margin-top:14px; padding:12px; font:inherit; font-size:16px; font-weight:700;
+    color:#fff; background:var(--navy); border:0; border-radius:8px; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  button.ghost { background:#fff; color:var(--navy); border:1px solid var(--navy); }
+  .row { display:flex; gap:8px; } .row button { margin-top:8px; }
+  .msg { margin-top:10px; font-size:14px; line-height:1.5; }
+  .msg.err { color:var(--err); } .msg.ok { color:var(--ok); }
+  .info { display:grid; grid-template-columns:110px 1fr; gap:6px 8px; font-size:15px; margin:0; }
+  .info dt { color:var(--muted); } .info dd { margin:0; font-weight:600; }
+  .hint { font-size:13px; color:var(--muted); line-height:1.55; margin:4px 0 0; }
+  .fieldmsg { font-size:13px; color:var(--err); min-height:0; margin-top:3px; }
+  .deadline { background:#fff6d6; border:1px solid #f2d27a; border-radius:8px; padding:8px 10px; font-size:14px; margin-top:10px; }
+  .rules { margin:6px 0 0; padding-left:20px; font-size:14px; line-height:1.6; }
+  .rules b { color:var(--err); }
+  .reject { background:#fdecea; border:1px solid #f5c2bd; color:var(--err); border-radius:8px; padding:8px 10px; font-size:14px; margin-top:10px; }
+  .consent { display:flex; gap:8px; align-items:flex-start; font-size:14px; margin-top:14px; line-height:1.5; font-weight:400; }
+  .consent input { margin-top:4px; width:18px; height:18px; flex:none; }
+  .hidden { display:none !important; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:99px; font-size:13px; background:#eef1f6; }
+
+  /* กรอบครอป 3:4 */
+  .cropper { position:relative; width:min(100%, 300px); aspect-ratio:3/4; margin:10px auto 0;
+    border-radius:10px; overflow:hidden; background:#e9edf3; touch-action:none; user-select:none; }
+  .cropper canvas { width:100%; height:100%; display:block; cursor:grab; }
+  .cropper canvas:active { cursor:grabbing; }
+  .cropper svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .cropper .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    text-align:center; color:var(--muted); font-size:14px; padding:20px; }
+  .zoom { display:flex; align-items:center; gap:8px; max-width:300px; margin:8px auto 0; font-size:14px; color:var(--muted); }
+  .zoom input { flex:1; }
+  .done { text-align:center; }
+  .done .big { font-size:46px; }
+  .done a { display:block; margin-top:12px; padding:12px; border-radius:8px; background:var(--navy); color:#fff; text-decoration:none; font-weight:700; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ลงทะเบียนรูปถ่ายนักศึกษา</h1>
+  <p>ระบบเช็คชื่อกิจกรรม · คณะพลศึกษา มกช. วิทยาเขตอุดรธานี</p>
+</header>
+<main>
+  <section class="card" id="step1">
+    <h2>1. ยืนยันตัวตน</h2>
+    <label for="sid">รหัสนักศึกษา</label>
+    <input id="sid" type="tel" inputmode="numeric" autocomplete="off" maxlength="13" placeholder="รหัส 11 หลัก">
+    <label for="lname">นามสกุล (ตามทะเบียน)</label>
+    <input id="lname" type="text" autocomplete="family-name">
+    <button id="btnLookup">ตรวจสอบ</button>
+    <div class="msg" id="msg1"></div>
+    <div class="deadline">📅 กำหนดส่ง: ภายในวันจันทร์ที่ 19 ตุลาคม พ.ศ. 2569</div>
+  </section>
+
+  <section class="card hidden" id="step2">
+    <h2>2. ตรวจสอบข้อมูลของคุณ</h2>
+    <dl class="info">
+      <dt>ชื่อ-นามสกุล</dt><dd id="vName"></dd>
+      <dt>รหัสนักศึกษา</dt><dd id="vId"></dd>
+      <dt>ชั้นปี / ห้อง</dt><dd id="vClass"></dd>
+      <dt>อาจารย์ที่ปรึกษา</dt><dd id="vAdvisor"></dd>
+      <dt>สถานะรูป</dt><dd><span class="badge" id="vStatus"></span></dd>
+    </dl>
+    <div class="reject hidden" id="vReject"></div>
+    <p class="hint">หากชื่อ ชั้นปี ห้อง หรืออาจารย์ที่ปรึกษาไม่ถูกต้อง โปรดแจ้งงานกิจการนักศึกษาและกิจการพิเศษ</p>
+  </section>
+
+  <section class="card hidden" id="step3">
+    <h2>3. ข้อมูลติดต่อ</h2>
+    <label for="email">อีเมลที่ใช้งานจริง <small>(บังคับ — ใช้แจ้งผลตรวจรูป)</small></label>
+    <input id="email" type="email" autocomplete="email" placeholder="name@gmail.com">
+    <div class="fieldmsg" id="emailMsg"></div>
+    <label for="phone">เบอร์มือถือ <small>(บังคับ)</small></label>
+    <input id="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="12" placeholder="08xxxxxxxx">
+    <div class="fieldmsg" id="phoneMsg"></div>
+    <label for="nick">ชื่อเล่น <small>(ไม่บังคับ)</small></label>
+    <input id="nick" type="text" maxlength="30" autocomplete="nickname">
+  </section>
+
+  <section class="card hidden" id="step4">
+    <h2>4. รูปถ่ายหน้าตรง</h2>
+    <ul class="rules">
+      <li>ชุดนักศึกษา หรือเสื้อเบลเซอร์/สูทกับเสื้อเชิ้ต — <b>ห้ามเสื้อวอร์ม เสื้อกีฬา เสื้อยืด เสื้อกล้าม</b></li>
+      <li>หน้าตรง ครึ่งตัว เห็นไหล่ทั้งสองข้าง ตาเปิด</li>
+      <li>ไม่สวมหมวก แว่นกันแดด หรือหน้ากากอนามัย</li>
+      <li>พื้นหลังเรียบ สว่าง ไม่ย้อนแสง ไม่มีคนอื่นในภาพ</li>
+      <li>รูปจริง ไม่ใช้ฟิลเตอร์/แอปแต่งหน้า/AI ไม่ถ่ายจากหน้าจอหรือบัตร</li>
+    </ul>
+    <p class="hint">💡 ให้เพื่อนถ่ายให้ห่างประมาณ 1 เมตร จะได้ภาพครึ่งตัวที่สวยกว่าเซลฟี่</p>
+
+    <div class="row">
+      <button class="ghost" id="btnCam" type="button">📷 ถ่ายรูป</button>
+      <button class="ghost" id="btnPick" type="button">🖼️ เลือกจากคลังรูป</button>
+    </div>
+    <input id="fileCam" type="file" accept="image/*" capture="environment" class="hidden">
+    <input id="file" type="file" accept="image/*" class="hidden">
+
+    <div class="cropper" id="cropper">
+      <canvas id="cv" width="480" height="640"></canvas>
+      <svg viewBox="0 0 300 400" id="guide" class="hidden" aria-hidden="true">
+        <defs><mask id="m"><rect width="300" height="400" fill="#fff"/><ellipse cx="150" cy="150" rx="66" ry="86" fill="#000"/></mask></defs>
+        <rect width="300" height="400" fill="rgba(0,0,0,.28)" mask="url(#m)"/>
+        <ellipse cx="150" cy="150" rx="66" ry="86" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="7 5"/>
+        <path d="M30 400 C40 300 95 270 150 268 C205 270 260 300 270 400" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="6 6" opacity=".8"/>
+        <text x="150" y="388" text-anchor="middle" fill="#fff" font-size="13" font-family="Sarabun,sans-serif">ใบหน้าในวงรี · ไหล่อยู่ในเส้นล่าง</text>
+      </svg>
+      <div class="empty" id="cropEmpty">ยังไม่ได้เลือกรูป<br>กด "ถ่ายรูป" หรือ "เลือกจากคลังรูป"</div>
+    </div>
+    <div class="zoom hidden" id="zoomBar">
+      <span>ย่อ</span><input type="range" id="zoom" min="1" max="4" step="0.01" value="1"><span>ขยาย</span>
+      <button class="ghost" id="btnRot" type="button" style="width:auto;margin:0;padding:6px 10px" title="หมุนรูป">↻</button>
+    </div>
+    <p class="hint hidden" id="cropHint" style="text-align:center">ลากรูปเพื่อเลื่อน · ใช้แถบหรือสองนิ้วเพื่อขยาย ให้ใบหน้าอยู่ในวงรี</p>
+    <div class="msg" id="msgPhoto"></div>
+
+    <label class="consent">
+      <input type="checkbox" id="consent">
+      <span>ข้าพเจ้ายืนยันว่าเป็นรูปของข้าพเจ้าเอง และยินยอมให้คณะพลศึกษาเก็บรูปถ่าย อีเมล เบอร์มือถือ และชื่อเล่น เพื่อใช้ยืนยันตัวตนและติดต่อเรื่องกิจกรรมนักศึกษาเท่านั้น</span>
+    </label>
+
+    <button id="btnSubmit" disabled>บันทึก</button>
+    <div class="msg" id="msg2"></div>
+  </section>
+
+  <section class="card done hidden" id="stepDone">
+    <div class="big">✅</div>
+    <h2>ส่งข้อมูลเรียบร้อย</h2>
+    <p class="hint">รูปของคุณอยู่ระหว่างรอเจ้าหน้าที่ตรวจ (ภายใน 3 วันทำการ) ผลจะแจ้งไปที่อีเมล <b id="doneEmail"></b><br>
+      หากรูปไม่ผ่าน ให้กลับมาที่หน้านี้แล้วอัปโหลดใหม่</p>
+    <a href="myqr.html" id="lnkQr">ขั้นต่อไป: เปิด "QR เช็คชื่อของฉัน"</a>
+  </section>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let current = null;
+
+  function say(el, text, ok) { el.textContent = text; el.className = 'msg ' + (ok ? 'ok' : 'err'); }
+  const show = (id, on) => $(id).classList.toggle('hidden', !on);
+
+  // ---------- ตรวจข้อมูลที่กรอก
+  function emailProblem(v) {
+    v = v.trim().toLowerCase();
+    if (!v) return 'กรุณากรอกอีเมล';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || /\.\./.test(v)) return 'รูปแบบอีเมลไม่ถูกต้อง';
+    const typo = { 'gmail.co': 'gmail.com', 'gmail.con': 'gmail.com', 'gmial.com': 'gmail.com', 'gmai.com': 'gmail.com',
+                   'gamil.com': 'gmail.com', 'hotmail.co': 'hotmail.com', 'hotmal.com': 'hotmail.com' }[v.split('@')[1]];
+    return typo ? 'อีเมลพิมพ์ผิดหรือไม่? น่าจะเป็น @' + typo : '';
+  }
+  function phoneDigits() { return $('phone').value.replace(/\D/g, ''); }
+  function phoneProblem() {
+    const d = phoneDigits();
+    if (!d) return 'กรุณากรอกเบอร์มือถือ';
+    return /^0[689]\d{8}$/.test(d) ? '' : 'เบอร์มือถือต้องเป็นตัวเลข 10 หลัก ขึ้นต้นด้วย 06 08 หรือ 09';
+  }
+  function checkField(input, msgEl, problem, strict) {
+    const p = problem();
+    msgEl.textContent = (strict || input.value.trim()) && p ? p : '';
+    input.classList.toggle('bad', !!msgEl.textContent);
+    return !p;
+  }
+  function refreshSubmit() {
+    $('btnSubmit').disabled = !(img && $('consent').checked && !emailProblem($('email').value) && !phoneProblem());
+  }
+
+  // ---------- ขั้นที่ 1
+  $('sid').onkeydown = $('lname').onkeydown = e => { if (e.key === 'Enter') $('btnLookup').click(); };
+  $('btnLookup').onclick = () => {
+    const id = $('sid').value.replace(/\D/g, ''), lname = $('lname').value.trim();
+    if (!id || !lname) return say($('msg1'), 'กรุณากรอกรหัสนักศึกษาและนามสกุล');
+    $('btnLookup').disabled = true; say($('msg1'), 'กำลังตรวจสอบ…', true);
+    google.script.run
+      .withSuccessHandler(r => {
+        $('btnLookup').disabled = false;
+        if (!r.ok) return say($('msg1'), r.msg);
+        current = { id: r.id, lastName: lname };
+        $('msg1').textContent = '';
+        $('vName').textContent = r.fullName;
+        $('vId').textContent = r.id;
+        $('vClass').textContent = 'ปี ' + r.year + ' / ห้อง ' + r.room;
+        $('vAdvisor').textContent = r.advisor || '-';
+        $('vStatus').textContent = r.photoStatus;
+        if (r.rejectReason || r.photoStatus === 'ไม่ผ่าน') {
+          $('vReject').textContent = '❌ รูปเดิมไม่ผ่าน: ' + (r.rejectReason || 'ไม่เป็นไปตามเกณฑ์') + ' — กรุณาอัปโหลดรูปใหม่';
+          show('vReject', true);
+        }
+        $('email').value = r.email || '';
+        $('phone').value = r.phone || '';
+        $('nick').value = r.nickname || '';
+        show('step1', false); show('step2', true); show('step3', true); show('step4', true);
+        refreshSubmit();
+      })
+      .withFailureHandler(e => { $('btnLookup').disabled = false; say($('msg1'), 'เกิดข้อผิดพลาด: ' + e.message); })
+      .registerLookup(id, lname);
+  };
+
+  $('email').oninput = () => { checkField($('email'), $('emailMsg'), () => emailProblem($('email').value)); refreshSubmit(); };
+  $('phone').oninput = () => { checkField($('phone'), $('phoneMsg'), phoneProblem); refreshSubmit(); };
+  $('email').onblur = () => checkField($('email'), $('emailMsg'), () => emailProblem($('email').value), true);
+  $('phone').onblur = () => checkField($('phone'), $('phoneMsg'), phoneProblem, true);
+  $('consent').onchange = refreshSubmit;
+
+  // ---------- ครอปรูป 3:4 (ผลลัพธ์ 480×640 JPEG)
+  const W = 480, H = 640, cv = $('cv'), ctx = cv.getContext('2d');
+  let img = null, rot = 0, zoom = 1, cx = W / 2, cy = H / 2;
+
+  function dims() { return rot % 2 ? { w: img.height, h: img.width } : { w: img.width, h: img.height }; }
+  function baseScale() { const d = dims(); return Math.max(W / d.w, H / d.h); }
+  function clampPos() {
+    const d = dims(), s = baseScale() * zoom, hw = d.w * s / 2, hh = d.h * s / 2;
+    cx = Math.min(hw, Math.max(W - hw, cx));
+    cy = Math.min(hh, Math.max(H - hh, cy));
+  }
+  function draw() {
+    if (!img) return;
+    clampPos();
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(rot * Math.PI / 2);
+    const s = baseScale() * zoom;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, -img.width * s / 2, -img.height * s / 2, img.width * s, img.height * s);
+    ctx.restore();
+  }
+
+  // อ่านไฟล์ แล้วย่อเหลือด้านยาว 1600px ไว้ก่อน (รูปมือถือ 12MP ลากแล้วจะหน่วง)
+  function loadFile(file) {
+    return new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => {
+        const k = Math.min(1, 1600 / Math.max(im.width, im.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(im.src);
+        if (c.width < 300 || c.height < 300) return reject(new Error('รูปเล็กเกินไป ไม่คมชัดพอ กรุณาใช้รูปที่ใหญ่กว่านี้'));
+        resolve(c);
+      };
+      im.onerror = () => reject(new Error(/heic|heif/i.test(file.type + file.name)
+        ? 'เบราว์เซอร์นี้เปิดไฟล์ HEIC ไม่ได้ — กด "ถ่ายรูป" แทน หรือแปลงรูปเป็น JPG ก่อน'
+        : 'อ่านไฟล์รูปไม่ได้ ลองเลือกรูปอื่น'));
+      im.src = URL.createObjectURL(file);
+    });
+  }
+
+  async function onFile(e) {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    $('msgPhoto').textContent = '';
+    try {
+      img = await loadFile(f);
+      rot = 0; zoom = 1; $('zoom').value = 1;
+      cx = W / 2;
+      // รูปแนวตั้งส่วนใหญ่หน้าอยู่ช่วงบน — เริ่มชิดด้านบนเล็กน้อย
+      const d = dims(), s = baseScale();
+      cy = d.h * s / 2 - Math.max(0, (d.h * s - H) * 0.15);
+      draw();
+      show('guide', true); show('cropEmpty', false); show('zoomBar', true); show('cropHint', true);
+    } catch (err) { say($('msgPhoto'), err.message); }
+    refreshSubmit();
+  }
+  $('btnCam').onclick = () => $('fileCam').click();
+  $('btnPick').onclick = () => $('file').click();
+  $('fileCam').onchange = onFile;
+  $('file').onchange = onFile;
+  $('zoom').oninput = () => { zoom = Number($('zoom').value); draw(); };
+  $('btnRot').onclick = () => { if (!img) return; rot = (rot + 1) % 4; draw(); };
+
+  // ลากด้วยนิ้ว/เมาส์ + ถ่างสองนิ้วเพื่อขยาย
+  const ptrs = new Map();
+  let pinch = null;
+  const k = () => W / cv.clientWidth;
+  cv.addEventListener('pointerdown', e => {
+    if (!img) return;
+    cv.setPointerCapture(e.pointerId);
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()];
+      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), z: zoom };
+    }
+  });
+  cv.addEventListener('pointermove', e => {
+    const p = ptrs.get(e.pointerId);
+    if (!p || !img) return;
+    if (ptrs.size === 1) {
+      cx += (e.clientX - p.x) * k(); cy += (e.clientY - p.y) * k();
+    }
+    p.x = e.clientX; p.y = e.clientY;
+    if (ptrs.size === 2 && pinch) {
+      const [a, b] = [...ptrs.values()];
+      zoom = Math.min(4, Math.max(1, pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d));
+      $('zoom').value = zoom;
+    }
+    draw();
+  });
+  const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; };
+  cv.addEventListener('pointerup', up);
+  cv.addEventListener('pointercancel', up);
+  cv.addEventListener('wheel', e => {
+    if (!img) return;
+    e.preventDefault();
+    zoom = Math.min(4, Math.max(1, zoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08)));
+    $('zoom').value = zoom; draw();
+  }, { passive: false });
+
+  function exportJpeg() {
+    draw();
+    let q = 0.86, out = cv.toDataURL('image/jpeg', q);
+    while (out.length > 260000 && q > 0.5) { q -= 0.08; out = cv.toDataURL('image/jpeg', q); }  // ~190KB ไฟล์จริง
+    return out;
+  }
+
+  // ---------- บันทึก
+  $('btnSubmit').onclick = () => {
+    const okE = checkField($('email'), $('emailMsg'), () => emailProblem($('email').value), true);
+    const okP = checkField($('phone'), $('phoneMsg'), phoneProblem, true);
+    if (!okE || !okP || !img) return;
+    $('btnSubmit').disabled = true; say($('msg2'), 'กำลังอัปโหลด…', true);
+    google.script.run
+      .withSuccessHandler(r => {
+        if (!r.ok) { say($('msg2'), r.msg); return refreshSubmit(); }
+        $('doneEmail').textContent = $('email').value.trim().toLowerCase();
+        ['step2', 'step3', 'step4'].forEach(id => show(id, false));
+        show('stepDone', true);
+        window.scrollTo(0, 0);
+      })
+      .withFailureHandler(e => { say($('msg2'), 'เกิดข้อผิดพลาด: ' + e.message); refreshSubmit(); })
+      .registerSubmit({ id: current.id, lastName: current.lastName, email: $('email').value.trim(),
+                        phone: phoneDigits(), nickname: $('nick').value.trim(),
+                        consent: $('consent').checked, photo: exportJpeg() });
+  };
+</script>
+</body>
+</html>
