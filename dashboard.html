@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard กิจกรรมนักศึกษา</title>
+<!-- ส่งคำขอไป Apps Script แทน google.script.run -->
+<script src="api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --navy:#1f3b6e; --gold:#f2b705;
+    --bg:#f4f6fa; --surface:#ffffff; --line:#e1e5ec; --track:#edf0f5;
+    --text:#1b1f29; --text-2:#52596a; --muted:#7a8193;
+    --series:#2a78d6;
+    --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b; --critical-2:#8f1d1d; --none:#c9ced8;
+    --ok-ink:#0b6b0b; --bad-ink:#b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg:#121417; --surface:#1a1a19; --line:#30343b; --track:#272b31;
+      --text:#f0efec; --text-2:#c3c2b7; --muted:#9a9a92;
+      --series:#3987e5; --none:#4a4f58; --critical-2:#b54747;
+      --ok-ink:#5fd35f; --bad-ink:#f08080;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg:#121417; --surface:#1a1a19; --line:#30343b; --track:#272b31;
+    --text:#f0efec; --text-2:#c3c2b7; --muted:#9a9a92;
+    --series:#3987e5; --none:#4a4f58; --critical-2:#b54747;
+    --ok-ink:#5fd35f; --bad-ink:#f08080;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:'Sarabun',system-ui,sans-serif; font-size:15px; }
+  header { background:var(--navy); color:#fff; padding:14px 16px; border-bottom:4px solid var(--gold); }
+  header .in { max-width:1100px; margin:0 auto; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:20px; }
+  header p { margin:2px 0 0; font-size:13px; opacity:.85; }
+  header a { color:#fff; font-size:13px; }
+  main { max-width:1100px; margin:0 auto; padding:16px; }
+  .hidden { display:none !important; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+  h2 { margin:0 0 4px; font-size:17px; color:var(--text); }
+  .sub { margin:0 0 12px; color:var(--text-2); font-size:13px; }
+  input, select { font:inherit; font-size:16px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--text); }
+  button { font:inherit; font-weight:700; border:0; border-radius:8px; padding:10px 14px; background:var(--navy); color:#fff; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--line); font-weight:600; }
+  .msg { color:var(--bad-ink); font-size:14px; margin-top:8px; }
+
+  /* แถบตัวกรอง */
+  .filters { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
+  .chip { padding:7px 14px; border-radius:99px; border:1px solid var(--line); background:var(--surface); color:var(--text); font-weight:600; }
+  .chip[aria-pressed="true"] { background:var(--navy); border-color:var(--navy); color:#fff; }
+  .filters .sp { flex:1; }
+  .stamp { color:var(--muted); font-size:13px; }
+
+  /* ตัวเลขสรุป */
+  .kpis { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; margin-bottom:14px; }
+  .kpi { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .kpi .l { color:var(--text-2); font-size:13px; }
+  .kpi .v { font-size:28px; font-weight:700; line-height:1.2; font-variant-numeric:tabular-nums; }
+  .kpi .v small { font-size:15px; color:var(--muted); font-weight:600; }
+  .kpi .n { color:var(--muted); font-size:12px; }
+  .kpi.warn { border-color:var(--warning); }
+
+  /* แถบซ้อน (stacked bar) — ช่องว่าง 2px ระหว่างส่วน ปลายมน 4px */
+  .legend { display:flex; flex-wrap:wrap; gap:6px 14px; margin:0 0 10px; font-size:13px; color:var(--text-2); }
+  .legend i { display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-1px; margin-right:5px; }
+  .rows { display:grid; gap:6px; }
+  .brow { display:grid; grid-template-columns:78px 1fr 92px; gap:10px; align-items:center; padding:3px 4px; border-radius:8px; }
+  .brow.click { cursor:pointer; }
+  .brow.click:hover, .brow:focus-visible { background:var(--track); outline:none; }
+  .brow .lab { font-weight:600; font-size:14px; white-space:nowrap; }
+  .brow .val { text-align:right; font-size:13px; color:var(--text-2); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .stack { display:flex; gap:2px; height:18px; background:var(--surface); }
+  .stack span { display:block; height:100%; min-width:2px; }
+  .stack span:first-child { border-radius:4px 0 0 4px; }
+  .stack span:last-child { border-radius:0 4px 4px 0; }
+  .stack span:only-child { border-radius:4px; }
+  .names { grid-column:1 / -1; margin:2px 0 8px 88px; padding:10px 12px; background:var(--track); border-radius:8px; font-size:13px; line-height:1.7; color:var(--text-2); }
+  .names b { color:var(--text); }
+  .yearhead { font-size:13px; color:var(--muted); font-weight:700; margin:10px 0 2px; }
+
+  /* ตาราง */
+  .tablewrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th { color:var(--text-2); font-weight:600; font-size:13px; white-space:nowrap; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .pill { display:inline-block; padding:2px 9px; border-radius:99px; font-size:12px; font-weight:700; white-space:nowrap; background:var(--track); color:var(--text-2); }
+  .pill.open { background:#c8e6c9; color:#0b4d0b; }
+  .pill.closed { background:#cfd8dc; color:#263238; }
+  .pill.dated { background:#fff3cd; color:#6b4e00; }
+  .pill.cancel { background:#f8d7da; color:#7a1c24; }
+  .meter { display:flex; align-items:center; gap:8px; min-width:150px; }
+  .meter .tr { flex:1; height:10px; background:var(--track); border-radius:4px; overflow:hidden; }
+  .meter .tr span { display:block; height:100%; background:var(--series); border-radius:4px; }
+  .meter b { font-size:13px; font-weight:600; color:var(--text-2); min-width:78px; text-align:right; font-variant-numeric:tabular-nums; }
+  .flag { color:var(--bad-ink); font-weight:600; }
+  .empty { color:var(--muted); font-size:14px; padding:6px 0; }
+
+  #tip { position:fixed; z-index:50; pointer-events:none; background:var(--text); color:var(--surface); font-size:13px; padding:7px 10px; border-radius:8px; max-width:260px; line-height:1.5; box-shadow:0 4px 14px rgba(0,0,0,.2); }
+  @media (max-width:600px) {
+    .brow { grid-template-columns:62px 1fr 74px; gap:6px; }
+    .names { margin-left:0; }
+    .kpi .v { font-size:24px; }
+  }
+</style>
+</head>
+<body>
+<header><div class="in">
+  <div><h1>📊 Dashboard กิจกรรมนักศึกษา</h1><p>คณะพลศึกษา มกช. วิทยาเขตอุดรธานี · <span id="hTerm"></span></p></div>
+  <a href="index.html">← หน้าแรก</a>
+</div></header>
+
+<main>
+  <section class="card hidden" id="login">
+    <h2>สำหรับแอดมิน</h2>
+    <p class="sub">ใส่รหัสแอดมิน (ADMIN_KEY) — ระบบจำไว้จนกว่าจะปิดแท็บนี้</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="key" type="password" autocomplete="current-password" style="flex:1;min-width:200px">
+      <button id="btnIn">เข้าดู</button>
+    </div>
+    <div class="msg" id="msgIn"></div>
+  </section>
+
+  <div id="dash" class="hidden">
+    <div class="filters" role="group" aria-label="กรองชั้นปี">
+      <span class="stamp">ชั้นปี:</span>
+      <button class="chip" data-y="" aria-pressed="true">ทั้งหมด</button>
+      <button class="chip" data-y="1" aria-pressed="false">ปี 1</button>
+      <button class="chip" data-y="2" aria-pressed="false">ปี 2</button>
+      <button class="chip" data-y="3" aria-pressed="false">ปี 3</button>
+      <button class="chip" data-y="4" aria-pressed="false">ปี 4</button>
+      <span class="sp"></span>
+      <span class="stamp" id="stamp"></span>
+      <button class="ghost" id="btnReload">⟳ รีเฟรช</button>
+      <button class="ghost" id="btnOut">ออก</button>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <section class="card">
+      <h2>🖼️ ความคืบหน้าการลงทะเบียนรูปถ่าย</h2>
+      <p class="sub" id="regSub"></p>
+      <div class="legend" id="regLegend"></div>
+      <div class="rows" id="regRows"></div>
+    </section>
+
+    <section class="card">
+      <h2>🎯 ผลการเข้าร่วมกิจกรรม (ผ่าน / ซ่อมกิจกรรม)</h2>
+      <p class="sub" id="resSub"></p>
+      <div class="legend" id="resLegend"></div>
+      <div class="rows" id="resRows"></div>
+      <div class="tablewrap" style="margin-top:12px"><table id="resTable"></table></div>
+    </section>
+
+    <section class="card">
+      <h2>📅 กิจกรรมภาคเรียนนี้</h2>
+      <p class="sub">จำนวนผู้เข้าร่วม (ไม่นับซ้ำ) เทียบกับจำนวนนักศึกษาชั้นปีที่ต้องเข้าร่วม</p>
+      <div class="tablewrap"><table id="actTable"></table></div>
+    </section>
+
+    <section class="card">
+      <h2>⚑ รายการที่ต้องตรวจสอบ</h2>
+      <p class="sub">แจ้งหน้าไม่ตรงรูป / สแกนเร็วผิดปกติ — รายการ "รอตรวจสอบ" ยังไม่นับในร้อยละ จนกว่าหัวหน้างานจะตรวจและลบคำนี้ในชีต "บันทึกเช็คชื่อ"</p>
+      <div class="tablewrap"><table id="alertTable"></table></div>
+    </section>
+
+    <section class="card">
+      <h2>🧑‍💼 ผู้ตรวจ</h2>
+      <p class="sub">ใช้ดูความผิดปกติ เช่น สแกนเร็วผิดปกติบ่อย หรือพิมพ์รหัสแทนการสแกน</p>
+      <div class="tablewrap"><table id="ckTable"></table></div>
+    </section>
+  </div>
+</main>
+<div id="tip" class="hidden" role="tooltip"></div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) {} };
+  const load = k => { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
+  const TH_MONTH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const thDate = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? +m[3] + ' ' + TH_MONTH[+m[2] - 1] + ' ' + String(+m[1] + 543).slice(2) : ''; };
+  const pct = (a, b) => b ? Math.round(a * 1000 / b) / 10 : 0;
+  const DEADLINE = '2026-10-19';
+
+  // สถานะรูป — สีสถานะคู่กับไอคอน+คำเสมอ (ไม่ใช้สีอย่างเดียว)
+  const PHOTO = [
+    { key: 'อนุมัติ', label: '✅ อนุมัติแล้ว', color: 'var(--good)' },
+    { key: 'รอตรวจ', label: '⏳ รอตรวจ', color: 'var(--warning)' },
+    { key: 'ไม่ผ่าน', label: '❌ ไม่ผ่าน (ต้องส่งใหม่)', color: 'var(--critical)' },
+    { key: 'ยังไม่มีรูป', label: '○ ยังไม่ส่ง', color: 'var(--none)' }
+  ];
+  // ผลการเข้าร่วม: ผ่าน แล้วไล่ความรุนแรงกลุ่มซ่อม 1→4
+  const RESULT = [
+    { key: 'ผ่าน', label: '✅ ผ่าน (≥80%)', color: 'var(--good)' },
+    { key: 'กลุ่ม 1', label: 'กลุ่ม 1 (61–79%)', color: 'var(--warning)' },
+    { key: 'กลุ่ม 2', label: 'กลุ่ม 2 (41–60%)', color: 'var(--serious)' },
+    { key: 'กลุ่ม 3', label: 'กลุ่ม 3 (21–40%)', color: 'var(--critical)' },
+    { key: 'กลุ่ม 4', label: 'กลุ่ม 4 (≤20%)', color: 'var(--critical-2)' }
+  ];
+
+  let KEY = '', DATA = null, YEAR = '', openRoom = '';
+  // แถวนักศึกษา: [รหัส, ชื่อ, ชั้นปี, ห้อง, สถานะรูป, QR, ร้อยละ, กลุ่ม, ธงมา, ธงจัด, จิตอาสา]
+  const S = { id: 0, name: 1, year: 2, room: 3, photo: 4, qr: 5, pct: 6, group: 7, flagIn: 8, flagHeld: 9, vol: 10 };
+
+  // ---------- เข้าระบบ / โหลดข้อมูล
+  function fetchData(k, silent) {
+    if (!silent) $('msgIn').textContent = 'กำลังโหลด…';
+    $('btnReload').disabled = true;
+    google.script.run.withSuccessHandler(r => {
+      $('btnReload').disabled = false;
+      if (!r.ok) { store('dash_key', null); $('dash').classList.add('hidden'); $('login').classList.remove('hidden'); $('msgIn').textContent = r.msg; return; }
+      KEY = k; store('dash_key', k); DATA = r;
+      $('login').classList.add('hidden'); $('dash').classList.remove('hidden'); $('msgIn').textContent = '';
+      render();
+    }).withFailureHandler(e => { $('btnReload').disabled = false; $('msgIn').textContent = e.message; $('login').classList.remove('hidden'); })
+      .dashboardData(k);
+  }
+  $('btnIn').onclick = () => { const k = $('key').value.trim(); if (k) fetchData(k); };
+  $('key').onkeydown = e => { if (e.key === 'Enter') $('btnIn').click(); };
+  $('btnReload').onclick = () => fetchData(KEY, true);
+  $('btnOut').onclick = () => { store('dash_key', null); location.reload(); };
+  document.querySelectorAll('.chip').forEach(b => b.onclick = () => {
+    YEAR = b.dataset.y; openRoom = '';
+    document.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    render();
+  });
+
+  const students = () => DATA.students.filter(s => !YEAR || s[S.year] === YEAR);
+  const roomKey = s => s[S.year] + '/' + s[S.room];
+
+  // ---------- วาดทั้งหน้า
+  function render() {
+    $('hTerm').textContent = 'ภาคเรียน ' + DATA.term;
+    $('stamp').textContent = 'ข้อมูล ณ ' + thDate(DATA.generatedAt) + ' ' + DATA.generatedAt.slice(11) + ' น.';
+    renderKpis(); renderReg(); renderResults(); renderActs(); renderAlerts(); renderCheckers();
+  }
+
+  function kpi(label, value, note, warn) {
+    return '<div class="kpi' + (warn ? ' warn' : '') + '"><div class="l">' + label + '</div><div class="v">' + value + '</div>' +
+      (note ? '<div class="n">' + note + '</div>' : '') + '</div>';
+  }
+  function renderKpis() {
+    const st = students(), n = st.length;
+    const sent = st.filter(s => s[S.photo] !== 'ยังไม่มีรูป').length;
+    const ok = st.filter(s => s[S.photo] === 'อนุมัติ').length;
+    const wait = st.filter(s => s[S.photo] === 'รอตรวจ').length;
+    const qr = st.filter(s => s[S.qr]).length;
+    const acts = DATA.activities.filter(a => a.status !== 'ยกเลิก');
+    const closed = acts.filter(a => a.status === 'ปิดแล้ว').length;
+    const pending = DATA.alerts.filter(a => a.pending).length;
+    const days = Math.ceil((new Date(DEADLINE + 'T23:59:59+07:00') - new Date()) / 86400000);
+    $('kpis').innerHTML =
+      kpi('นักศึกษา' + (YEAR ? ' ปี ' + YEAR : ''), n.toLocaleString('th-TH'), '') +
+      kpi('ส่งรูปแล้ว', sent + ' <small>/ ' + n + '</small>', pct(sent, n) + '% · ' + (days >= 0 ? 'เหลือ ' + days + ' วันถึง 19 ต.ค.' : 'เลยกำหนดส่งแล้ว')) +
+      kpi('รูปอนุมัติแล้ว', ok, wait ? '⏳ รอตรวจ ' + wait + ' คน' : 'ไม่มีรูปค้างตรวจ', wait > 0) +
+      kpi('เปิดใช้ QR แล้ว', qr + ' <small>/ ' + n + '</small>', pct(qr, n) + '%') +
+      kpi('กิจกรรมที่ปิดแล้ว', closed + ' <small>/ ' + acts.length + '</small>', 'นับร้อยละ ' + DATA.countedActivities + ' กิจกรรม') +
+      kpi('เช็คชื่อวันนี้', DATA.todayCount, 'ทุกกิจกรรม ทุกชั้นปี') +
+      kpi('⚑ รอตรวจสอบ', pending, pending ? 'ยังไม่นับในร้อยละ' : 'ไม่มีรายการค้าง', pending > 0);
+  }
+
+  // ---------- แถบซ้อน + คำอธิบายเมื่อชี้
+  function legend(el, defs) { $(el).innerHTML = defs.map(d => '<span><i style="background:' + d.color + '"></i>' + d.label + '</span>').join(''); }
+  function stack(defs, counts, total, label) {
+    return '<div class="stack">' + defs.filter(d => counts[d.key]).map(d =>
+      '<span style="flex:' + counts[d.key] + ';background:' + d.color + '" data-tip="' +
+      esc(label + ' · ' + d.label + ': ' + counts[d.key] + ' คน (' + pct(counts[d.key], total) + '%)') + '"></span>').join('') + '</div>';
+  }
+
+  function renderReg() {
+    const st = students();
+    legend('regLegend', PHOTO);
+    const rooms = {};
+    st.forEach(s => { const k = roomKey(s); (rooms[k] = rooms[k] || []).push(s); });
+    const keys = Object.keys(rooms).sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
+    const sent = st.filter(s => s[S.photo] !== 'ยังไม่มีรูป').length;
+    $('regSub').textContent = 'ส่งแล้ว ' + sent + ' จาก ' + st.length + ' คน (' + pct(sent, st.length) + '%) · กำหนดส่ง 19 ต.ค. 2569 · แตะที่ห้องเพื่อดูรายชื่อที่ยังไม่ส่ง/ต้องส่งใหม่';
+    let html = '', lastYear = '';
+    keys.forEach(k => {
+      const list = rooms[k], y = k.split('/')[0];
+      if (!YEAR && y !== lastYear) { html += '<div class="yearhead">ชั้นปีที่ ' + esc(y) + '</div>'; lastYear = y; }
+      const counts = {}; list.forEach(s => { counts[s[S.photo]] = (counts[s[S.photo]] || 0) + 1; });
+      const done = list.length - (counts['ยังไม่มีรูป'] || 0);
+      html += '<div class="brow click" tabindex="0" role="button" aria-expanded="' + (openRoom === k) + '" data-room="' + esc(k) + '">' +
+        '<span class="lab">ปี' + esc(k) + '</span>' + stack(PHOTO, counts, list.length, 'ปี ' + k) +
+        '<span class="val">' + done + '/' + list.length + ' · ' + Math.round(pct(done, list.length)) + '%</span></div>';
+      if (openRoom === k) {
+        const todo = list.filter(s => s[S.photo] === 'ยังไม่มีรูป' || s[S.photo] === 'ไม่ผ่าน');
+        html += '<div class="names">' + (todo.length
+          ? '<b>ยังไม่ส่ง / ต้องส่งใหม่ ' + todo.length + ' คน:</b><br>' + todo.map(s => esc(s[S.id] + ' ' + s[S.name]) + (s[S.photo] === 'ไม่ผ่าน' ? ' <span class="flag">(ไม่ผ่าน)</span>' : '')).join('<br>')
+          : '<b>ส่งครบทุกคนแล้ว ✅</b>') + '</div>';
+      }
+    });
+    $('regRows').innerHTML = html || '<div class="empty">ไม่มีข้อมูล</div>';
+    $('regRows').querySelectorAll('.brow.click').forEach(r => {
+      const toggle = () => { openRoom = openRoom === r.dataset.room ? '' : r.dataset.room; renderReg(); };
+      r.onclick = toggle;
+      r.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
+    });
+  }
+
+  function renderResults() {
+    const st = students();
+    legend('resLegend', RESULT);
+    if (!DATA.countedActivities) {
+      $('resSub').textContent = 'ยังไม่มีกิจกรรมที่ "ปิดแล้ว" และติ๊ก "นับในร้อยละ" ในภาคเรียนนี้ — ผลจะขึ้นเมื่อปิดกิจกรรมแรก';
+      $('resLegend').innerHTML = ''; $('resRows').innerHTML = ''; $('resTable').innerHTML = '';
+      return;
+    }
+    $('resSub').textContent = 'คิดจากกิจกรรมที่ปิดแล้ว ' + DATA.countedActivities + ' กิจกรรม · เกณฑ์ผ่าน ' + DATA.passPercent + '% · รายการ "รอตรวจสอบ" ยังไม่นับ';
+    const years = YEAR ? [YEAR] : ['1', '2', '3', '4'];
+    const tableRows = [];
+    $('resRows').innerHTML = years.map(y => {
+      const list = st.filter(s => s[S.year] === y && s[S.pct] != null);
+      const counts = {}; list.forEach(s => { counts[s[S.group]] = (counts[s[S.group]] || 0) + 1; });
+      const flagShort = st.filter(s => s[S.year] === y && s[S.flagHeld] && s[S.flagIn] * 100 < s[S.flagHeld] * 80).length;
+      const volShort = st.filter(s => s[S.year] === y && s[S.vol] < DATA.volunteerMin).length;
+      tableRows.push([y, list.length].concat(RESULT.map(d => counts[d.key] || 0), [flagShort, volShort]));
+      return '<div class="brow"><span class="lab">ปี ' + y + '</span>' +
+        (list.length ? stack(RESULT, counts, list.length, 'ปี ' + y) : '<div class="empty">ยังไม่มีกิจกรรมที่นับ</div>') +
+        '<span class="val">ผ่าน ' + Math.round(pct(counts['ผ่าน'] || 0, list.length)) + '%</span></div>';
+    }).join('');
+    $('resTable').innerHTML = '<thead><tr><th>ชั้นปี</th><th class="num">คน</th>' + RESULT.map(d => '<th class="num">' + d.key + '</th>').join('') +
+      '<th class="num">ธงชาติ &lt;80%</th><th class="num">จิตอาสา &lt;' + DATA.volunteerMin + '</th></tr></thead><tbody>' +
+      tableRows.map(r => '<tr>' + r.map((v, i) => i === 0 ? '<td>ปี ' + v + '</td>' : '<td class="num">' + v + '</td>').join('') + '</tr>').join('') + '</tbody>';
+  }
+
+  function renderActs() {
+    const pillClass = { 'เปิดเช็คชื่อ': 'open', 'ปิดแล้ว': 'closed', 'กำหนดวันแล้ว': 'dated', 'ยกเลิก': 'cancel' };
+    const yrs = a => a.years === 'ทุกชั้นปี' ? null : String(a.years).split(/[,\s]+/);
+    const acts = DATA.activities.filter(a => !YEAR || !yrs(a) || yrs(a).indexOf(YEAR) >= 0)
+      .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
+    if (!acts.length) { $('actTable').innerHTML = '<tr><td class="empty">ไม่มีกิจกรรม</td></tr>'; return; }
+    $('actTable').innerHTML = '<thead><tr><th>วันที่</th><th>กิจกรรม</th><th>ชั้นปี</th><th>สถานะ</th><th>ผู้เข้าร่วม</th></tr></thead><tbody>' +
+      acts.map(a => {
+        const p = pct(a.attended, a.expected), started = a.status === 'เปิดเช็คชื่อ' || a.status === 'ปิดแล้ว';
+        return '<tr><td style="white-space:nowrap">' + (a.date ? thDate(a.date) : '<span class="stamp">' + esc(a.window || '—') + '</span>') + '</td>' +
+          '<td>' + esc(a.name) + (a.countable ? '' : ' <span class="stamp">(ไม่นับ %)</span>') + '</td><td>' + esc(a.years) + '</td>' +
+          '<td><span class="pill ' + (pillClass[a.status] || '') + '">' + esc(a.status) + '</span></td>' +
+          '<td>' + (started ? '<div class="meter"><div class="tr"><span style="width:' + Math.min(100, p) + '%" data-tip="' +
+            esc(a.name + ': ' + a.attended + ' จาก ' + a.expected + ' คน (' + p + '%)') + '"></span></div><b>' + a.attended + '/' + a.expected + ' · ' + Math.round(p) + '%</b></div>'
+            : '<span class="stamp">—</span>') + '</td></tr>';
+      }).join('') + '</tbody>';
+  }
+
+  function renderAlerts() {
+    const list = DATA.alerts;
+    if (!list.length) { $('alertTable').innerHTML = '<tr><td class="empty">ไม่มีรายการที่ต้องตรวจสอบ ✅</td></tr>'; return; }
+    $('alertTable').innerHTML = '<thead><tr><th>เวลา</th><th>กิจกรรม</th><th>นักศึกษา</th><th>ผู้ตรวจ</th><th>สิ่งที่พบ</th><th>แถวในชีต</th></tr></thead><tbody>' +
+      list.map(a => '<tr><td style="white-space:nowrap">' + thDate(a.time) + ' ' + esc(a.time.slice(11)) + '</td><td>' + esc(a.act) + '</td>' +
+        '<td>' + esc(a.id) + '<br>' + esc(a.name) + '</td><td>' + esc(a.checker) + '</td>' +
+        '<td class="' + (a.pending ? 'flag' : '') + '">' + (a.pending ? '⚑ ' : '') + esc(a.flags) + '</td><td class="num">' + a.row + '</td></tr>').join('') + '</tbody>';
+  }
+
+  function renderCheckers() {
+    const list = DATA.checkers;
+    if (!list.length) { $('ckTable').innerHTML = '<tr><td class="empty">ยังไม่มีการเช็คชื่อ</td></tr>'; return; }
+    $('ckTable').innerHTML = '<thead><tr><th>ผู้ตรวจ</th><th class="num">สแกนทั้งหมด</th><th class="num">วันนี้</th><th class="num">สแกนเร็วผิดปกติ</th><th class="num">แจ้งหน้าไม่ตรง</th><th class="num">พิมพ์รหัส</th></tr></thead><tbody>' +
+      list.map(c => '<tr><td>' + esc(c.name) + '</td><td class="num">' + c.total + '</td><td class="num">' + c.today + '</td>' +
+        '<td class="num' + (c.rapid ? ' flag' : '') + '">' + c.rapid + (c.total ? ' <span class="stamp">(' + Math.round(pct(c.rapid, c.total)) + '%)</span>' : '') + '</td>' +
+        '<td class="num">' + c.mismatch + '</td><td class="num">' + c.manual + '</td></tr>').join('') + '</tbody>';
+  }
+
+  // ---------- tooltip เมื่อชี้/แตะแถบ
+  const tip = $('tip');
+  document.addEventListener('pointerover', e => {
+    const t = e.target.closest('[data-tip]');
+    if (!t) { tip.classList.add('hidden'); return; }
+    tip.textContent = t.dataset.tip; tip.classList.remove('hidden');
+  });
+  document.addEventListener('pointermove', e => {
+    if (tip.classList.contains('hidden')) return;
+    const x = Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 8);
+    tip.style.left = Math.max(8, x) + 'px'; tip.style.top = (e.clientY + 16) + 'px';
+  });
+  document.addEventListener('scroll', () => tip.classList.add('hidden'), { passive: true });
+
+  const saved = load('dash_key');
+  if (saved) fetchData(saved); else $('login').classList.remove('hidden');
+</script>
+</body>
+</html>
