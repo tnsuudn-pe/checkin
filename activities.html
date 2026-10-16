@@ -178,10 +178,12 @@
         more = '<button class="link" data-act="cancel">ยกเลิกกิจกรรมนี้</button>';
       } else if (a.status === S.OPEN) {
         main = '<button class="main" data-act="close">■ ปิดเช็คชื่อ</button>';
+        more = '<button class="link" data-act="drytest" style="color:var(--navy)">🧪 ทดสอบรายงาน (ส่งถึงบัญชีกลาง)</button>';
         side = '<button class="ghost" data-act="back" title="กดเปิดผิด — กลับไปสถานะก่อนเปิด">↩ ย้อนกลับ</button>';
       } else if (a.status === S.CLOSED) {
         main = '<button class="ok main" data-act="report">📨 สรุปผลแจ้งที่ปรึกษา</button>';
         side = '<button class="ghost" data-act="reopen" title="เปิดเช็คชื่อใหม่">↺</button>';
+        more = '<button class="link" data-act="drytest" style="color:var(--navy)">🧪 ทดสอบรายงาน (ส่งถึงบัญชีกลาง)</button>';
         more = '<button class="link" data-act="back">↩ ย้อนกลับ (ไม่นับในสรุปผล)</button>';
       } else {
         main = '<button class="ghost main" data-act="back">↺ กู้คืนกิจกรรม</button>';
@@ -218,15 +220,17 @@
     }
     const act = e.target.dataset.act; if (!act) return;
     const card = e.target.closest('.act'), code = card.dataset.code, S = DATA.status;
-    if (act === 'report') {
-      const nm = card.querySelector('.name').textContent;
-      if (!confirm('สรุปผล "' + nm + '" และส่งอีเมลถึงอาจารย์ที่ปรึกษาทุกห้องที่เกี่ยวข้อง?\n(ส่งซ้ำได้ แต่อาจารย์จะได้อีเมลซ้ำ)')) return;
+    if (act === 'report' || act === 'drytest') {
+      const nm = card.querySelector('.name').textContent, dry = act === 'drytest';
+      if (!confirm(dry ? 'ทดสอบรายงาน "' + nm + '"\nอีเมลทุกฉบับจะส่งถึงบัญชีกลางแทนอาจารย์ (อาจารย์ไม่ได้รับ) และไม่บันทึกรายงาน'
+                       : 'สรุปผล "' + nm + '" และส่งอีเมลถึงอาจารย์ที่ปรึกษาทุกห้องที่เกี่ยวข้อง?\n(ส่งซ้ำได้ แต่อาจารย์จะได้อีเมลซ้ำ)')) return;
+      const label = e.target.textContent;
       e.target.disabled = true; e.target.textContent = '⏳ กำลังสรุปและส่งอีเมล…';
       google.script.run.withSuccessHandler(r => {
-        e.target.disabled = false; e.target.textContent = '📨 สรุปผลแจ้งที่ปรึกษา';
-        say('สรุปผล ' + r.rooms + ' ห้อง · ส่งอีเมล ' + r.mails + ' ฉบับ' + (r.skipped.length ? ' · ข้าม: ' + r.skipped.join(' / ') : ''), !r.skipped.length);
-      }).withFailureHandler(x => { e.target.disabled = false; e.target.textContent = '📨 สรุปผลแจ้งที่ปรึกษา'; say(x.message, false); })
-        .webReportActivity(KEY, code);
+        e.target.disabled = false; e.target.textContent = label;
+        say((r.dryRun ? '🧪 ทดสอบ: ส่ง ' + r.mails + ' ฉบับถึง ' + r.testTo : 'สรุปผล ' + r.rooms + ' ห้อง · ส่งอีเมล ' + r.mails + ' ฉบับ') + (r.skipped.length ? ' · ข้าม: ' + r.skipped.join(' / ') : ''), !r.skipped.length);
+      }).withFailureHandler(x => { e.target.disabled = false; e.target.textContent = label; say(x.message, false); })
+        .webReportActivity(KEY, code, dry);
       return;
     }
     const name = card.querySelector('.name').textContent;
