@@ -77,7 +77,7 @@
       <video id="video" playsinline muted></video>
       <div class="frame"></div>
       <div class="count" id="count">สแกนแล้ว 0 คน</div>
-      <div class="look hidden" id="look"><span>📸 สุ่มถ่ายรูปนักศึกษา</span><small>ให้นักศึกษาลดมือถือลง และมองกล้องของผู้ตรวจ</small><b id="lookN">3</b><small>ผู้ตรวจ: หันกล้องไปที่หน้านักศึกษา</small></div>
+      <div class="look hidden" id="look"><span>📸 สุ่มถ่ายรูปนักศึกษา</span><small>ให้นักศึกษาลดมือถือลง และมองกล้องของผู้ตรวจ</small><b id="lookN">2</b><small>ผู้ตรวจ: หันกล้องไปที่หน้านักศึกษา</small></div>
     </div>
     <div class="msg" id="camMsg" style="color:#fff"></div>
     <!-- หน้าเว็บ Apps Script ไม่ได้รับสิทธิ์กล้องแบบสด — ใช้แอปกล้องของมือถือถ่ายแล้วอ่าน QR จากภาพแทน -->
@@ -95,6 +95,9 @@
 <script>
   const $ = id => document.getElementById(id);
   let KEY = '', ROLE = '', stream = null, busy = false, lastText = '', lastAt = 0, scanned = 0, timer = null;
+  // สแกนต่อเนื่อง: ส่งผลไปตรวจเบื้องหลัง ไม่ต้องรอคำตอบก่อนสแกนคนถัดไป (busy = เฉพาะตอนนับถอยหลังถ่ายรูป)
+  let inflight = 0, lastId = '', lastIdAt = 0;
+  const DETECTOR = ('BarcodeDetector' in window) ? (() => { try { return new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { return null; } })() : null;
 
   function store(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} }
   function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -206,22 +209,35 @@
   };
   function stopCam() { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } }
 
-  let lastDecode = 0;
-  function loop(t) {
-    if (!stream) return;
-    requestAnimationFrame(loop);
-    if (busy || t - lastDecode < 180) return;
-    lastDecode = t;
-    const v = $('video'); if (!v.videoWidth) return;
+  let lastDecode = 0, decoding = false;
+  async function readFrame(v) {
+    // ตัวอ่าน QR ในตัวเครื่อง (Android Chrome) เร็วและอ่านมุมเอียงได้ดีกว่า — ไม่มีจึงใช้ jsQR
+    if (DETECTOR) {
+      try { const r = await DETECTOR.detect(v); return r.length ? r[0].rawValue : ''; } catch (e) { /* ใช้ jsQR แทน */ }
+    }
     const w = 480, h = Math.round(v.videoHeight * w / v.videoWidth), cv = $('cv');
     cv.width = w; cv.height = h;
     const ctx = cv.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(v, 0, 0, w, h);
     const code = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
-    if (!code || !code.data) return;
-    if (code.data === lastText && Date.now() - lastAt < 4000) return;   // QR เดิมยังอยู่หน้ากล้อง
-    lastText = code.data; lastAt = Date.now();
-    submit(code.data, '');
+    return code && code.data ? code.data : '';
+  }
+  async function loop(t) {
+    if (!stream) return;
+    requestAnimationFrame(loop);
+    if (busy || decoding || t - lastDecode < 120) return;
+    lastDecode = t;
+    const v = $('video'); if (!v.videoWidth) return;
+    decoding = true;
+    let text = '';
+    try { text = await readFrame(v); } finally { decoding = false; }
+    if (!text || busy) return;
+    const now = Date.now();
+    if (text === lastText && now - lastAt < 4000) return;   // QR เดิมยังอยู่หน้ากล้อง
+    const id = (text.match(/^PE\d\.(\d{11})\./) || [])[1] || '';
+    if (id && id === lastId && now - lastIdAt < 8000) return;   // คนเดิมยังยืนอยู่ (QR เปลี่ยนทุก 10 วิ)
+    lastText = text; lastAt = now; lastId = id; lastIdAt = now;
+    submit(text, '');
   }
 
   /** ถ่ายภาพจากกล้องตัวเดียวกัน ย่อเหลือกว้าง 320px (~15–20 KB) */
@@ -232,13 +248,15 @@
   }
 
   function lookAndSnap(row) {
-    let n = 3; $('lookN').textContent = n; $('look').classList.remove('hidden');
+    busy = true;   // หยุดอ่าน QR ระหว่างนับถอยหลัง
+    let n = 2; $('lookN').textContent = n; $('look').classList.remove('hidden');
     beep(660, 150); buzz([60, 60, 60]);
     const iv = setInterval(() => {
       n--; $('lookN').textContent = n;
       if (n > 0) { beep(660, 150); buzz(60); return; }
       clearInterval(iv); $('look').classList.add('hidden');
       const img = snap(); beep(1320, 250); buzz(150);
+      busy = false; lastId = ''; lastText = '';
       const fl = document.createElement('div'); fl.className = 'flash'; document.body.appendChild(fl); setTimeout(() => fl.remove(), 180);
       const st = $('photoState'); if (st) st.textContent = '📸 กำลังส่งรูป…';
       run('uploadScanPhoto', [KEY, row, img], r => {
@@ -248,10 +266,17 @@
   }
 
   // ---------- บันทึกเช็คชื่อ
+  function setInflight(d) {
+    inflight += d;
+    $('count').textContent = 'สแกนแล้ว ' + scanned + ' คน' + (inflight > 0 ? ' · ⏳ กำลังตรวจ ' + inflight : '');
+  }
   function submit(text, manualId) {
-    busy = true; clearTimeout(timer);
-    $('result').innerHTML = '<div class="result dup"><h2>⏳ กำลังตรวจสอบ…</h2></div>';
-    run('checkIn', [KEY, $('act').value, text, manualId], r => show(r), m => show({ ok: false, msg: m }));
+    clearTimeout(timer);
+    if (SNAP_MODE) { busy = true; $('result').innerHTML = '<div class="result dup"><h2>⏳ กำลังตรวจสอบ…</h2></div>'; }
+    beep(1000, 40);   // อ่าน QR ติดแล้ว — ให้นักศึกษาคนถัดไปยื่นได้เลย
+    setInflight(1);
+    run('checkIn', [KEY, $('act').value, text, manualId],
+      r => { setInflight(-1); show(r); }, m => { setInflight(-1); show({ ok: false, msg: m }); });
   }
 
   function cardHtml(c) {
@@ -264,13 +289,13 @@
     if (!r.ok) {
       pop('bad', r.screenshot ? '📵 ภาพแคปหน้าจอ?' : 'ไม่สำเร็จ', r.msg);
       html = '<div class="result bad"><h2>❌ ไม่บันทึก</h2><div>' + esc(r.msg) + '</div></div>';
-      timer = setTimeout(resume, 3500);
+      if (SNAP_MODE) timer = setTimeout(resume, 3500);
     } else if (r.dup) {
       pop('dup', 'เช็คชื่อไปแล้ว', r.card && r.card.fullName);
       html = '<div class="result dup"><h2>⚠️ ' + esc(r.msg) + '</h2>' + cardHtml(r.card) + '</div>';
-      timer = setTimeout(resume, 3500);
+      if (SNAP_MODE) timer = setTimeout(resume, 3500);
     } else {
-      pop('ok', 'สำเร็จ', r.card && r.card.fullName); scanned++; $('count').textContent = 'สแกนแล้ว ' + scanned + ' คน';
+      pop('ok', 'สำเร็จ', r.card && r.card.fullName); scanned++; setInflight(0);
       html = '<div class="result ok"><h2>✅ เช็คชื่อแล้ว · ตรวจหน้าให้ตรงรูป</h2>' + cardHtml(r.card) +
         (r.flags && r.flags.length ? '<div class="flags">⚑ ' + esc(r.flags.join(', ')) + '</div>' : '') +
         '<div class="hint" id="photoState"></div>' +
@@ -279,8 +304,7 @@
         // โหมดถ่ายภาพ: ต้องถ่ายรูปหน้าก่อนไปคนถัดไป (ไม่ตั้งเวลาข้ามให้)
         pendingRow = r.row; $('faceLabel').classList.remove('hidden');
       } else {
-        if (r.needPhoto) lookAndSnap(r.row);
-        timer = setTimeout(resume, r.needPhoto ? 7500 : 4000);
+        if (r.needPhoto) lookAndSnap(r.row);   // การ์ดค้างไว้ให้เทียบหน้า จนผลของคนถัดไปมาแทน
       }
     }
     $('result').innerHTML = html;
@@ -296,7 +320,6 @@
         bad._t = setTimeout(() => {
           delete bad.dataset.armed;
           bad.textContent = '🚫 หน้าไม่ตรง'; bad.style.background = ''; bad.style.color = '';
-          timer = setTimeout(resume, 3000);
         }, 3000);
         return;
       }
@@ -308,16 +331,16 @@
         bad.textContent = '🚫 แจ้งแล้ว — รอหัวหน้างานตรวจ';
         pop('bad', 'แจ้งหน้าไม่ตรงแล้ว', 'ถ่ายรูปคนที่ถือมือถือเป็นหลักฐาน');
         if (SNAP_MODE) { pendingRow = row; $('faceLabel').classList.remove('hidden'); }
-        else { setTimeout(() => lookAndSnap(row), 1200); timer = setTimeout(resume, 9000); }
+        else { busy = true; setTimeout(() => lookAndSnap(row), 1200); }
       }, m => { bad.disabled = false; bad.textContent = '🚫 ลองอีกครั้ง: ' + m; });
     };
     const g = $('btnG'); if (g) g.onclick = () => {
       clearTimeout(timer); g.disabled = true;
-      run('setScanEval', [KEY, +g.dataset.row, 'G'], x => { g.textContent = x.ok ? '⭐ บันทึก G แล้ว' : x.msg; timer = setTimeout(resume, 2500); });
+      run('setScanEval', [KEY, +g.dataset.row, 'G'], x => { g.textContent = x.ok ? '⭐ บันทึก G แล้ว' : x.msg; });
     };
   }
 
-  function resume() { clearTimeout(timer); busy = false; $('result').innerHTML = ''; }
+  function resume() { clearTimeout(timer); busy = false; if (SNAP_MODE) $('result').innerHTML = ''; }
 
   $('btnManual').onclick = () => {
     const id = $('manual').value.trim(); if (!id) return;
