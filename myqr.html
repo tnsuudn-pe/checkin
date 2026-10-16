@@ -24,7 +24,13 @@
   .who { text-align:center; }
   .who b { font-size:19px; display:block; }
   .who span { color:var(--muted); }
-  #qr { display:flex; justify-content:center; margin:14px 0 8px; }
+  /* กรอบสีหมุนตลอดเวลา + เปลี่ยนสีทุกครั้งที่ QR เปลี่ยน — ภาพแคปหน้าจอจะนิ่ง ผู้ตรวจดูออกทันที */
+  .ring { position:relative; max-width:316px; margin:14px auto 8px; padding:8px; border-radius:18px; overflow:hidden; isolation:isolate; }
+  .ring::before { content:''; position:absolute; inset:-60%; z-index:-1;
+    background:conic-gradient(var(--hue, #1a7f4b), transparent 30%, var(--hue, #1a7f4b) 50%, transparent 80%, var(--hue, #1a7f4b));
+    animation:spin 1.6s linear infinite; }
+  @keyframes spin { to { transform:rotate(1turn); } }
+  #qr { display:flex; justify-content:center; background:#fff; border-radius:12px; }
   #qr svg { width:100%; max-width:300px; height:auto; }
   .bar { height:8px; background:#e6eaf2; border-radius:4px; overflow:hidden; }
   .bar i { display:block; height:100%; background:var(--ok); transition:width 1s linear; }
@@ -51,10 +57,10 @@
 
   <section class="card hidden" id="show">
     <div class="who"><b id="vName"></b><span id="vInfo"></span></div>
-    <div id="qr"></div>
+    <div class="ring" id="ring"><div id="qr"></div></div>
     <div class="bar"><i id="bar" style="width:100%"></i></div>
-    <div class="live"><span><span class="dot"></span> QR เปลี่ยนใน <b id="left">30</b> วิ</span><span class="clock" id="clock"></span></div>
-    <p class="hint" style="margin:10px 0 0">ยื่นหน้าจอนี้ให้ผู้ตรวจสแกน · <b>ภาพหน้าจอ (screenshot) ใช้ไม่ได้</b> เพราะ QR หมดอายุภายใน 1 นาที</p>
+    <div class="live"><span><span class="dot"></span> QR เปลี่ยนใน <b id="left">10</b> วิ</span><span class="clock" id="clock"></span></div>
+    <p class="hint" style="margin:10px 0 0">ยื่นหน้าจอนี้ให้ผู้ตรวจสแกน · <b>ภาพแคปหน้าจอหรือภาพที่ส่งต่อใช้ไม่ได้</b> — QR เปลี่ยนทุก 10 วินาที ระบบรับเฉพาะ QR สด และกรอบสีต้องหมุนอยู่ตลอด</p>
     <div class="net" id="net"></div>
   </section>
 
@@ -67,6 +73,7 @@
 <script>
   const $ = id => document.getElementById(id);
   const STORE = 'pe_myqr_v1';
+  const STEP = 10;   // วินาที — ต้องตรงกับ QR_STEP_SEC ใน Code.gs
   let REC = null, lastStep = -1;
 
   function save(r) { try { localStorage.setItem(STORE, JSON.stringify(r)); } catch (e) {} }
@@ -88,18 +95,19 @@
   }
 
   async function tick() {
-    const t = now(), stepMs = REC.step * 1000, step = Math.floor(t / stepMs);
+    const t = now(), stepMs = STEP * 1000, step = Math.floor(t / stepMs);
     const left = Math.ceil((stepMs - (t % stepMs)) / 1000);
     $('left').textContent = left;
-    $('bar').style.width = (left / REC.step * 100) + '%';
+    $('bar').style.width = (left / STEP * 100) + '%';
     $('clock').textContent = new Date(t).toLocaleTimeString('th-TH', { hour12: false });
     if (step !== lastStep) {
       lastStep = step;
       const code = await totp(REC.secret, step);
       const qr = qrcode(0, 'M');
-      qr.addData('PE1.' + REC.id + '.' + code);
+      qr.addData('PE2.' + REC.id + '.' + step + '.' + code);   // ฝังช่วงเวลาไว้ ระบบรู้อายุ QR
       qr.make();
       $('qr').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
+      $('ring').style.setProperty('--hue', 'hsl(' + (step * 47 % 360) + ' 75% 45%)');
     }
   }
 

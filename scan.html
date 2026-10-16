@@ -262,7 +262,7 @@
   function show(r) {
     let html;
     if (!r.ok) {
-      pop('bad', 'ไม่สำเร็จ', r.msg);
+      pop('bad', r.screenshot ? '📵 ภาพแคปหน้าจอ?' : 'ไม่สำเร็จ', r.msg);
       html = '<div class="result bad"><h2>❌ ไม่บันทึก</h2><div>' + esc(r.msg) + '</div></div>';
       timer = setTimeout(resume, 3500);
     } else if (r.dup) {
