@@ -69,6 +69,8 @@
     <div class="live"><span><span class="dot"></span> QR เปลี่ยนใน <b id="left">10</b> วิ</span><span class="clock" id="clock"></span></div>
     <p class="hint" style="margin:10px 0 0">ยื่นหน้าจอนี้ให้ผู้ตรวจสแกน · <b>ภาพแคปหน้าจอหรือภาพที่ส่งต่อใช้ไม่ได้</b> — QR เปลี่ยนทุก 10 วินาที ระบบรับเฉพาะ QR สด และกรอบสีต้องหมุนอยู่ตลอด</p>
     <div class="net" id="net"></div>
+    <button id="btnMe" type="button" style="background:#fff;color:var(--navy);border:1px solid var(--navy)">📊 ผลการเข้าร่วมกิจกรรมของฉัน</button>
+    <div id="me" class="hidden" style="margin-top:12px;font-size:14px;line-height:1.6"></div>
   </section>
 
   <section class="card hint">
@@ -153,8 +155,27 @@
     }).withFailureHandler(e => { $('btnOn').disabled = false; $('msg').textContent = e.message; }).qrActivate(id, ln);
   };
 
+  // ผลการเข้าร่วมของฉัน — ยืนยันตัวด้วยรหัส QR ปัจจุบันของเครื่องนี้ (ไม่ต้องใส่รหัสผ่าน)
+  $('btnMe').onclick = async () => {
+    const box = $('me'); box.classList.remove('hidden'); box.textContent = 'กำลังโหลด…';
+    const step = Math.floor(now() / (STEP * 1000)), code = await totp(REC.secret, step);
+    google.script.run.withSuccessHandler(r => {
+      if (!r.ok) { box.textContent = r.msg; return; }
+      const e = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      const head = r.required
+        ? '<b style="font-size:22px;color:var(--navy)">' + r.percent + '%</b> · เข้าร่วม ' + r.done + '/' + r.required + ' กิจกรรมที่นับ · <b>' + e(r.group) + '</b>' +
+          (r.task ? '<br><span class="hint">งานซ่อม: ' + e(r.task) + '</span>' : '')
+        : 'ยังไม่มีกิจกรรมที่ปิดแล้วในภาค ' + e(r.term);
+      box.innerHTML = head +
+        '<br>🇹🇭 ธงชาติ: ' + (e(r.flagText) || '—') + ' · 🤝 จิตอาสาปีนี้: ' + r.volunteer + '/' + r.volunteerMin +
+        (r.activities.length ? '<ul style="padding-left:18px;margin:8px 0 0">' + r.activities.map(a =>
+          '<li>' + (a.result ? (a.result === 'รอตรวจสอบ' ? '⏳' : '✅') : '❌') + ' ' + e(a.name) + (a.result === 'G' ? ' ⭐G' : '') + (a.result === 'รอตรวจสอบ' ? ' (รอตรวจสอบ)' : '') + '</li>').join('') + '</ul>' : '');
+    }).withFailureHandler(x => { box.textContent = 'ต่ออินเทอร์เน็ตแล้วลองใหม่ (' + x.message + ')'; }).myStatus(REC.id, step, code);
+  };
+
   REC = loadRec();
   if (REC && REC.secret) showQr(); else $('setup').classList.remove('hidden');
 </script>
+<script src="news.js"></script>
 </body>
 </html>
