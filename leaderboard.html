@@ -371,7 +371,11 @@
       $('confetti').innerHTML = ''; return;
     }
     $('stageSub').textContent = (YEAR ? 'ชั้นปีที่ ' + YEAR : 'ทั้งคณะ') + ' · ' + (att ? 'ค่าเฉลี่ยร้อยละการเข้าร่วม' : 'ร้อยละที่ส่งรูปแล้ว');
-    const top = list.slice(0, 3);
+    const top = list.filter(x => x.score > 0).slice(0, 3);
+    if (!top.length) {
+      $('podium').innerHTML = '<div class="empty">' + (att ? 'ยังไม่มีห้องที่มีผู้เข้าร่วม' : 'ยังไม่มีห้องไหนส่งรูปถ่าย — ห้องแรกที่ส่งจะขึ้นโพเดียมทันที! 🚀') + '</div>';
+      $('confetti').innerHTML = ''; return;
+    }
     const order = [[top[1], 'p2', '🥈'], [top[0], 'p1', '🥇'], [top[2], 'p3', '🥉']];
     $('podium').innerHTML = order.map(([x, cls, medal]) => x ?
       '<div class="place ' + cls + '"><div class="who"><span class="medal">' + medal + '</span><b>ปี ' + esc(x.r.room) + '</b><small>' + f1(x.score) + '%</small></div>' +
