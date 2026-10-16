@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>จัดการกิจกรรม · คณะพลศึกษา</title>
+<!-- ส่งคำขอไป Apps Script แทน google.script.run -->
+<script src="api.js"></script>
+<style>
+  :root { --navy:#1f3b6e; --line:#d9dee8; --muted:#5b6475; --ok:#1a7f4b; --err:#b42318; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 'Sarabun',Arial,sans-serif; color:#1b1f29; }
+  main { max-width:760px; margin:0 auto; padding:16px; }
+  h3 { margin:6px 0 10px; font-size:17px; color:var(--navy); }
+  select, input, button { font:inherit; }
+  input, select { width:100%; padding:9px 10px; font-size:16px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  button { padding:10px 14px; border:0; border-radius:6px; background:var(--navy); color:#fff; cursor:pointer; font-weight:600; }
+  button.ghost { background:#fff; color:var(--navy); border:1px solid var(--navy); }
+  button.ok { background:var(--ok); }
+  button.link { background:none; color:var(--err); padding:4px 6px; font-weight:600; }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:6px; align-items:center; }
+  .row > * { flex:1; }
+  .box { background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+  details.box summary { cursor:pointer; font-weight:700; color:var(--navy); }
+  label { display:block; font-size:13.5px; color:var(--muted); margin:6px 0 2px; }
+  .act { background:#fff; border:1px solid var(--line); border-left:5px solid #b0bec5; border-radius:12px; padding:12px 14px; margin-bottom:10px; }
+  .act.s-เปิดเช็คชื่อ { border-left-color:#2e7d32; background:#f1f8f2; }
+  .act.s-กำหนดวันแล้ว { border-left-color:#f2b705; }
+  .act.s-ปิดแล้ว, .act.s-ยกเลิก { opacity:.7; }
+  .name { font-weight:700; font-size:16px; }
+  .meta { color:var(--muted); font-size:13px; }
+  .badge { display:inline-block; padding:0 7px; border-radius:99px; font-size:11.5px; background:#eceff1; margin-right:4px; }
+  .date { display:grid; grid-template-columns:70px 1fr 90px 32px; gap:4px; margin-top:6px; align-items:center; }
+  .date select { padding:5px 4px; }
+  .date .clear { background:none; color:var(--muted); padding:0; font-size:16px; }
+  .thai { font-size:13.5px; color:var(--navy); margin-top:2px; }
+  .btns { display:flex; gap:6px; margin-top:6px; align-items:center; }
+  .btns .main { flex:1; }
+  .more { position:relative; }
+  .more summary { list-style:none; cursor:pointer; padding:4px 8px; border:1px solid var(--line); border-radius:6px; color:var(--muted); font-weight:700; }
+  .more summary::-webkit-details-marker { display:none; }
+  .more .menu { position:absolute; right:0; top:30px; z-index:3; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.12); padding:4px; white-space:nowrap; }
+  #msg { position:fixed; left:50%; transform:translateX(-50%); bottom:18px; z-index:50; padding:10px 16px; border-radius:10px; font-size:14px; font-weight:600; display:none; box-shadow:0 6px 18px rgba(0,0,0,.18); max-width:92vw; }
+  .hidden { display:none !important; }
+  .tools { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .tools a, .tools button { text-decoration:none; font-weight:700; font-size:14px; padding:8px 14px; border-radius:99px; border:1px solid var(--line); background:#fff; color:var(--navy); }
+  #msg.ok { display:block; background:#e3f4ea; color:var(--ok); }
+  #msg.err { display:block; background:#fdecea; color:var(--err); }
+  .empty { color:var(--muted); text-align:center; padding:16px 0; }
+</style>
+<link rel="stylesheet" href="theme.css">
+<link rel="icon" href="logo-mark.png">
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <a class="brand" href="index.html"><img src="logo-mark.png" alt="ตรามหาวิทยาลัยการกีฬาแห่งชาติ"><span><b>คณะพลศึกษา</b><small>มหาวิทยาลัยการกีฬาแห่งชาติ วิทยาเขตอุดรธานี</small></span></a>
+  <nav aria-label="เมนูหลัก"><a href="index.html">หน้าแรก</a><a href="register.html">ลงทะเบียนรูป</a><a href="myqr.html">QR ของฉัน</a><a href="leaderboard.html">🏆 อันดับห้อง</a><a href="scan.html">สแกนเช็คชื่อ</a><a href="activities.html" aria-current="page">จัดการกิจกรรม</a><a href="dashboard.html">Dashboard</a></nav>
+</div></header>
+<section class="band"><div class="wrap"><div class="titles"><div class="crumb"><a href="index.html">หน้าแรก</a> › จัดการกิจกรรม</div><h1>📅 จัดการกิจกรรม</h1><p>เพิ่มกิจกรรม กำหนดวัน เปิด–ปิดเช็คชื่อ (สำหรับแอดมิน/หัวหน้างาน)</p></div></div></section>
+<main>
+<div id="msg"></div>
+
+<section class="box hidden" id="login">
+  <h3>สำหรับแอดมิน / หัวหน้างาน</h3>
+  <label for="key">รหัสแอดมิน (ADMIN_KEY) — ระบบจำไว้จนกว่าจะปิดแท็บ</label>
+  <div class="row"><input id="key" type="password" autocomplete="current-password"><button id="btnIn" style="flex:none">เข้าใช้</button></div>
+</section>
+
+<div id="app" class="hidden">
+<div class="tools"><a href="scan.html">📷 ไปหน้าสแกน</a><a href="dashboard.html">📊 Dashboard</a><button id="btnReload" type="button">⟳ รีเฟรช</button><button id="btnOut" type="button">ออก</button></div>
+
+<div class="box">
+  <label for="term">ภาคเรียน</label>
+  <select id="term"></select>
+</div>
+
+<details class="box" id="addBox">
+  <summary>➕ เพิ่มกิจกรรม</summary>
+  <label for="aName">ชื่อกิจกรรม</label>
+  <input id="aName" placeholder="เช่น กิจกรรมวันไหว้ครู">
+  <div class="row">
+    <div><label for="aType">ประเภท</label><select id="aType"></select></div>
+    <div><label for="aYears">ชั้นปี</label><input id="aYears" value="ทั้งหมด" placeholder="ทั้งหมด หรือ 1,2"></div>
+  </div>
+  <label for="aWindow">ช่วงที่จัด (ถ้ายังไม่รู้วัน)</label>
+  <input id="aWindow" placeholder="เช่น ปลาย พ.ย. 69">
+  <label>วันที่จริง (ถ้ารู้แล้ว)</label>
+  <div id="aDate"></div>
+  <div class="btns"><button class="main" id="btnAdd">บันทึกกิจกรรม</button></div>
+</details>
+
+<h3 id="listTitle">กิจกรรม</h3>
+<div id="list"><div class="empty">กำลังโหลด…</div></div>
+</div>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const THIS_BE = new Date().getFullYear() + 543;
+  let DATA = null, KEY = '';
+  // ชื่อฟังก์ชันในแผงชีต -> ฟังก์ชันเว็บที่ต้องใช้รหัสแอดมิน
+  const WEB = { panelData: 'webActivities', saveActivityDate: 'webSetActivityDate', setActivityStatus: 'webSetActivityStatus', addActivity: 'webAddActivity' };
+  const sstore = (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) {} };
+  const sload = k => { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
+
+  function say(text, ok) {
+    const m = $('msg'); m.textContent = text; m.className = ok ? 'ok' : 'err';
+    clearTimeout(say.t); say.t = setTimeout(() => { m.className = ''; }, 4000);
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  function call(fn, args, done) {
+    google.script.run.withSuccessHandler(done).withFailureHandler(e => {
+      say(e.message, false);
+      if (/เฉพาะแอดมิน/.test(e.message)) { sstore('dash_key', null); $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
+    })[WEB[fn]].apply(null, [KEY].concat(args));
+  }
+
+  // ---------- ตัวเลือกวันที่ วัน / เดือน / ปี พ.ศ. (ไม่ขึ้นกับภาษาของเครื่อง)
+  function dateHtml(iso) {
+    const [y, m, d] = iso ? iso.split('-').map(Number) : [0, 0, 0];
+    const be = y ? y + 543 : 0;
+    const years = [THIS_BE - 1, THIS_BE, THIS_BE + 1, THIS_BE + 2];
+    if (be && years.indexOf(be) < 0) years.push(be);
+    const opt = (v, t, sel) => '<option value="' + v + '"' + (sel ? ' selected' : '') + '>' + t + '</option>';
+    let h = '<select class="d" aria-label="วัน">' + opt('', 'วัน', !d);
+    for (let i = 1; i <= 31; i++) h += opt(i, i, i === d);
+    h += '</select><select class="m" aria-label="เดือน">' + opt('', 'เดือน', !m);
+    MONTHS.forEach((t, i) => { h += opt(i + 1, t, i + 1 === m); });
+    h += '</select><select class="y" aria-label="ปี พ.ศ.">' + opt('', 'ปี', !be);
+    years.sort().forEach(v => { h += opt(v, v, v === be); });
+    return h + '</select><button class="clear" title="ล้างวันที่" type="button">✕</button>';
+  }
+  /** อ่านค่าจาก 3 ช่อง -> 'yyyy-mm-dd' (ค.ศ.), '' = ยังไม่ครบ, null = วันไม่มีจริง */
+  function readDate(box) {
+    const d = +box.querySelector('.d').value, m = +box.querySelector('.m').value, be = +box.querySelector('.y').value;
+    if (!d || !m || !be) return '';
+    const y = be - 543, dt = new Date(y, m - 1, d);
+    if (dt.getMonth() !== m - 1) return null;
+    return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+  function thaiFull(iso) {
+    if (!iso) return 'ยังไม่กำหนดวัน';
+    const [y, m, d] = iso.split('-').map(Number);
+    const wd = new Date(y, m - 1, d).toLocaleDateString('th-TH', { weekday: 'long' });
+    return wd + 'ที่ ' + d + ' ' + MONTHS[m - 1] + ' ' + (y + 543);
+  }
+
+  function load(term) { call('panelData', [term || ''], d => { DATA = d; sstore('dash_key', KEY); $('login').classList.add('hidden'); $('app').classList.remove('hidden'); render(); }); }
+
+  function render() {
+    const S = DATA.status;
+    $('term').innerHTML = DATA.terms.map(t => '<option' + (t === DATA.term ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    if (!$('aType').options.length) {
+      $('aType').innerHTML = DATA.types.map(t => '<option>' + esc(t) + '</option>').join('');
+      $('aDate').className = 'date'; $('aDate').innerHTML = dateHtml('');
+    }
+    $('listTitle').textContent = 'กิจกรรมภาค ' + DATA.term + ' (' + DATA.list.length + ')';
+    if (!DATA.list.length) { $('list').innerHTML = '<div class="empty">ยังไม่มีกิจกรรมในภาคนี้</div>'; return; }
+    $('list').innerHTML = DATA.list.map(a => {
+      let main = '', side = '', more = '';
+      if (a.status === S.PLAN || a.status === S.DATED) {
+        main = '<button class="ok main" data-act="open">▶ เปิดเช็คชื่อ</button>';
+        more = '<button class="link" data-act="cancel">ยกเลิกกิจกรรมนี้</button>';
+      } else if (a.status === S.OPEN) {
+        main = '<button class="main" data-act="close">■ ปิดเช็คชื่อ</button>';
+        side = '<button class="ghost" data-act="back" title="กดเปิดผิด — กลับไปสถานะก่อนเปิด">↩ ย้อนกลับ</button>';
+      } else if (a.status === S.CLOSED) {
+        main = '<button class="ghost main" data-act="reopen">↺ เปิดเช็คชื่อใหม่</button>';
+        more = '<button class="link" data-act="back">↩ ย้อนกลับ (ไม่นับในสรุปผล)</button>';
+      } else {
+        main = '<button class="ghost main" data-act="back">↺ กู้คืนกิจกรรม</button>';
+      }
+      const moreHtml = more ? '<details class="more"><summary title="ตัวเลือกเพิ่มเติม">⋯</summary><div class="menu">' + more + '</div></details>' : '';
+      const editable = a.status !== S.CLOSED && a.status !== S.CANCEL;
+      return '<div class="act s-' + esc(a.status) + '" data-code="' + esc(a.code) + '" data-date="' + esc(a.date) + '">' +
+        '<div class="name">' + esc(a.name) + '</div>' +
+        '<div class="meta"><span class="badge">' + esc(a.status) + '</span>' + esc(a.type) + ' · ปี ' + esc(a.years) +
+        (a.window ? ' · ช่วง: ' + esc(a.window) : '') + ' · ' + esc(a.code) + '</div>' +
+        (editable ? '<div class="date">' + dateHtml(a.date) + '</div>' : '') +
+        '<div class="thai">📅 ' + thaiFull(a.date) + '</div>' +
+        '<div class="btns">' + main + side + moreHtml + '</div></div>';
+    }).join('');
+  }
+
+  $('term').onchange = e => load(e.target.value);
+
+  // เปลี่ยนวัน/เดือน/ปี — บันทึกเมื่อเลือกครบทั้ง 3 ช่อง
+  $('list').addEventListener('change', e => {
+    if (e.target.tagName !== 'SELECT') return;
+    const card = e.target.closest('.act'), iso = readDate(card.querySelector('.date'));
+    if (iso === '') return;
+    if (iso === null) return say('วันที่นี้ไม่มีจริง (เช่น 31 ก.พ.) กรุณาเลือกใหม่', false);
+    call('saveActivityDate', [card.dataset.code, iso], () => { say('บันทึกวันที่แล้ว: ' + thaiFull(iso), true); load(DATA.term); });
+  });
+
+  $('list').addEventListener('click', e => {
+    if (e.target.classList.contains('clear')) {
+      const card = e.target.closest('.act');
+      if (!card.dataset.date) { card.querySelectorAll('.date select').forEach(s => { s.value = ''; }); return; }
+      call('saveActivityDate', [card.dataset.code, ''], () => { say('ล้างวันที่แล้ว', true); load(DATA.term); });
+      return;
+    }
+    const act = e.target.dataset.act; if (!act) return;
+    const card = e.target.closest('.act'), code = card.dataset.code, S = DATA.status;
+    const name = card.querySelector('.name').textContent;
+    const target = { open: S.OPEN, reopen: S.OPEN, close: S.CLOSED, cancel: S.CANCEL, back: S.DATED }[act];
+    const ask = {
+      open: card.dataset.date ? null : 'ยังไม่ได้กำหนดวัน ระบบจะใส่ "วันนี้" เป็นวันจัดกิจกรรม\nเปิดเช็คชื่อ "' + name + '" ใช่ไหม?',
+      close: 'ปิดเช็คชื่อ "' + name + '"?\nกิจกรรมนี้จะถูกนับในสรุปผล',
+      cancel: 'ยกเลิกกิจกรรม "' + name + '"?\nจะไม่ถูกนับในสรุปผล (กู้คืนได้ภายหลัง)',
+      back: 'ย้อน "' + name + '" กลับไปสถานะก่อนเปิดเช็คชื่อ?\nการเช็คชื่อที่บันทึกแล้วยังอยู่ แต่จะไม่ถูกนับจนกว่าจะปิดเช็คชื่อ'
+    }[act];
+    if (ask && !confirm(ask)) return;
+    e.target.disabled = true;
+    call('setActivityStatus', [code, target], st => { say(name + ': ' + st, true); load(DATA.term); });
+  });
+
+  // ปิดเมนู ⋯ ที่เปิดค้างเมื่อคลิกที่อื่น
+  document.addEventListener('click', e => {
+    document.querySelectorAll('details.more[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; });
+  });
+
+  $('btnAdd').onclick = () => {
+    const iso = readDate($('aDate'));
+    if (iso === null) return say('วันที่นี้ไม่มีจริง กรุณาเลือกใหม่', false);
+    const p = { name: $('aName').value.trim(), type: $('aType').value, years: $('aYears').value.trim(),
+                window: $('aWindow').value.trim(), date: iso, term: DATA.term };
+    if (!p.name) return say('กรุณาใส่ชื่อกิจกรรม', false);
+    $('btnAdd').disabled = true;
+    google.script.run
+      .withSuccessHandler(code => {
+        $('btnAdd').disabled = false; say('เพิ่มกิจกรรมแล้ว (' + code + ')', true);
+        $('aName').value = ''; $('aWindow').value = ''; $('aDate').innerHTML = dateHtml('');
+        $('addBox').open = false; load(DATA.term);
+      })
+      .withFailureHandler(e => { $('btnAdd').disabled = false; say(e.message, false); })
+      .webAddActivity(KEY, p);
+  };
+
+  $('btnIn').onclick = () => { KEY = $('key').value.trim(); if (KEY) load(''); };
+  $('key').onkeydown = e => { if (e.key === 'Enter') $('btnIn').click(); };
+  $('btnReload').onclick = () => load(DATA ? DATA.term : '');
+  $('btnOut').onclick = () => { sstore('dash_key', null); location.reload(); };
+  KEY = sload('dash_key') || '';
+  if (KEY) load(''); else $('login').classList.remove('hidden');
+</script>
+</body>
+</html>

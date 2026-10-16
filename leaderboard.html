@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>อันดับห้อง · คณะพลศึกษา</title>
+<!-- ส่งคำขอไป Apps Script แทน google.script.run -->
+<script src="api.js"></script>
+<style>
+  :root {
+    --navy:#0a2a66; --gold:#d9a520; --line:#e1e5ec; --track:#edf0f5;
+    --text:#1b1f29; --text-2:#52596a; --muted:#7a8193; --surface:#fff;
+    --series:#2a78d6; --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+    --gold-m:#e8b923; --silver-m:#b8c2cf; --bronze-m:#c9814a;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; color:var(--text); font-size:15px; }
+  main { max-width:1100px; margin:0 auto; padding:16px; }
+  .hidden { display:none !important; }
+  .card { background:var(--surface); border:1px solid var(--line); padding:16px; margin-bottom:14px; }
+  h2 { margin:0 0 4px; font-size:18px; }
+  .sub { margin:0 0 12px; color:var(--text-2); font-size:13px; line-height:1.55; }
+  .muted { color:var(--muted); font-size:13px; }
+
+  /* แท็บ + ตัวกรอง */
+  .bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
+  .tab, .chip { font:inherit; font-weight:700; border:1px solid var(--line); background:var(--surface); color:var(--text); border-radius:99px; padding:8px 16px; cursor:pointer; }
+  .tab[aria-selected="true"] { background:var(--navy); border-color:var(--navy); color:#fff; }
+  .chip { font-weight:600; padding:6px 13px; font-size:14px; }
+  .chip[aria-pressed="true"] { background:var(--gold); border-color:var(--gold); color:#1d1a10; }
+  .bar .sp { flex:1; }
+
+  /* ---------- เวทีโพเดียมสามมิติ */
+  .stage { position:relative; overflow:hidden; border-radius:18px; margin-bottom:14px; min-height:380px;
+    background:radial-gradient(ellipse at 50% 0%, #2a5bb8 0%, #0a2a66 55%, #061a42 100%); color:#fff; }
+  .stage h2 { color:#fff; text-align:center; padding-top:16px; font-size:20px; }
+  .stage .sub { color:#d6e2ff; text-align:center; margin:0; }
+  .spot { position:absolute; top:-40px; width:220px; height:520px; background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0)); filter:blur(6px); transform-origin:top center; animation:spot 6s ease-in-out infinite alternate; pointer-events:none; }
+  .spot.l { left:8%; transform:rotate(18deg); } .spot.r { right:8%; transform:rotate(-18deg); animation-delay:-3s; }
+  @keyframes spot { to { opacity:.35; } }
+  .scene { perspective:1000px; perspective-origin:50% 10%; height:300px; display:flex; justify-content:center; align-items:flex-end; padding-bottom:26px; }
+  .podium { transform-style:preserve-3d; display:flex; align-items:flex-end; gap:14px; transform:rotateX(14deg) rotateY(-14deg); animation:sway 9s ease-in-out infinite alternate; }
+  @keyframes sway { to { transform:rotateX(14deg) rotateY(14deg); } }
+  .place { position:relative; width:118px; display:flex; flex-direction:column; align-items:center; transform-style:preserve-3d; }
+  .who { text-align:center; margin-bottom:8px; transform:translateZ(30px); animation:pop .6s cubic-bezier(.2,1.6,.4,1) both; animation-delay:calc(var(--d) + .9s); }
+  .who .medal { font-size:40px; line-height:1; display:block; filter:drop-shadow(0 4px 6px rgba(0,0,0,.4)); animation:spinY 3.5s linear infinite; }
+  @keyframes spinY { to { transform:rotateY(360deg); } }
+  .who b { display:block; font-family:'Prompt',sans-serif; font-size:19px; margin-top:4px; }
+  .who small { display:block; font-size:13px; color:#ffe9a8; font-weight:700; }
+  @keyframes pop { from { opacity:0; transform:translateZ(30px) translateY(20px) scale(.6); } }
+  /* กล่อง 3 มิติ: หน้า + บน + ข้าง */
+  .block { position:relative; width:118px; height:var(--h); transform-style:preserve-3d; transform-origin:bottom; animation:rise 1.1s cubic-bezier(.2,.9,.3,1.15) both; animation-delay:var(--d); }
+  @keyframes rise { from { transform:scaleY(0); } }
+  .block i { position:absolute; display:block; }
+  .block .front { inset:0; background:linear-gradient(180deg, var(--c) 0%, var(--c2) 100%); transform:translateZ(30px); display:flex; align-items:flex-start; justify-content:center; padding-top:10px;
+    font-family:'Prompt',sans-serif; font-weight:700; font-size:44px; color:rgba(255,255,255,.92); text-shadow:0 2px 0 rgba(0,0,0,.25); font-style:normal; border-radius:4px 4px 0 0; }
+  .block .top { left:0; width:118px; height:60px; top:-30px; background:var(--c); filter:brightness(1.15); transform:rotateX(90deg); }
+  .block .side { top:0; width:60px; height:100%; right:-30px; background:var(--c2); filter:brightness(.75); transform:rotateY(90deg); }
+  .block .side.l { right:auto; left:-30px; transform:rotateY(-90deg); }
+  .p1 { --c:var(--gold-m); --c2:#b8860b; --h:150px; --d:.5s; }
+  .p2 { --c:var(--silver-m); --c2:#7d8a99; --h:108px; --d:.2s; }
+  .p3 { --c:var(--bronze-m); --c2:#8a4f22; --h:78px; --d:.8s; }
+  .floor { position:absolute; left:50%; bottom:6px; width:520px; height:40px; transform:translateX(-50%); background:radial-gradient(ellipse, rgba(0,0,0,.45), transparent 70%); }
+  .confetti { position:absolute; inset:0; pointer-events:none; overflow:hidden; perspective:600px; }
+  .confetti b { position:absolute; top:-20px; width:9px; height:14px; border-radius:2px; animation:fall var(--t) linear var(--dl) infinite; }
+  @keyframes fall { to { transform:translate3d(var(--x), 440px, 0) rotateX(var(--r)) rotateY(var(--r)); } }
+  .stage .empty { text-align:center; padding:90px 20px; color:#d6e2ff; }
+  @media (prefers-reduced-motion: reduce) {
+    .podium, .spot, .who .medal, .confetti { animation:none !important; }
+    .confetti { display:none; }
+    .block, .who { animation-duration:.01s !important; animation-delay:0s !important; }
+  }
+
+  /* ---------- อันดับทั้งหมด (แถบ + ช่วงความเชื่อมั่น 95%) */
+  .rank { display:grid; gap:4px; }
+  .rrow { display:grid; grid-template-columns:44px 74px 1fr 120px; gap:10px; align-items:center; padding:5px 6px; border-radius:10px; }
+  .rrow.top { background:#fff8e1; }
+  .rrow .no { font-family:'Prompt',sans-serif; font-weight:700; font-size:18px; text-align:center; color:var(--navy); }
+  .rrow .rm { font-weight:700; white-space:nowrap; }
+  .rrow .val { text-align:right; font-variant-numeric:tabular-nums; font-size:14px; }
+  .rrow .val small { display:block; color:var(--muted); font-size:11px; }
+  .track { position:relative; height:16px; background:var(--track); border-radius:4px; }
+  .track .fill { position:absolute; left:0; top:0; bottom:0; background:var(--series); border-radius:4px; transform-origin:left; animation:grow .9s ease-out both; }
+  @keyframes grow { from { transform:scaleX(0); } }
+  .track .ci { position:absolute; top:50%; height:2px; background:var(--text); transform:translateY(-50%); }
+  .track .ci::before, .track .ci::after { content:''; position:absolute; top:-5px; width:2px; height:12px; background:var(--text); }
+  .track .ci::before { left:0; } .track .ci::after { right:0; }
+  .track .goal { position:absolute; top:-4px; bottom:-4px; width:2px; background:var(--text-2); opacity:.6; }
+
+  /* ---------- กราฟ SVG */
+  svg text { font-family:'Sarabun',sans-serif; fill:var(--text-2); font-size:12px; }
+  svg .grid { stroke:var(--line); stroke-width:1; }
+  svg .axis { stroke:#b6bdcb; stroke-width:1; }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:13px; color:var(--text-2); margin-bottom:6px; }
+  .legend i { display:inline-block; width:14px; height:3px; border-radius:2px; vertical-align:middle; margin-right:5px; }
+  .chartwrap { overflow-x:auto; }
+
+  /* ---------- ตารางสถิติ */
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  th, td { padding:7px 9px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--text-2); font-weight:600; font-size:12.5px; }
+  .test { background:#f6f8fc; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:12px; line-height:1.7; font-size:14px; }
+  .test b { font-family:'Prompt',sans-serif; font-weight:600; }
+  .test .sig { color:#0b6b0b; font-weight:700; } .test .ns { color:var(--text-2); font-weight:700; }
+  .note { font-size:12px; color:var(--muted); margin-top:8px; line-height:1.6; }
+
+
+  /* ---------- ถ้วยรางวัลประจำกิจกรรม (ระบบปลดล็อกความสำเร็จ) */
+  .trophies { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; }
+  .tro { position:relative; border-radius:16px; padding:14px 12px 12px; text-align:center; overflow:hidden; border:1px solid var(--line);
+    background:linear-gradient(180deg, #13306e 0%, #0a1d47 100%); color:#fff; }
+  .tro.locked { background:linear-gradient(180deg, #2b2f38 0%, #1c1f25 100%); color:#9aa3b2; }
+  .tro .quest { font-size:11.5px; letter-spacing:.3px; color:#ffd56b; font-weight:700; }
+  .tro.locked .quest { color:#8a93a3; }
+  .tro .art { width:120px; height:150px; margin:6px auto 2px; display:block; }
+  .tro:not(.locked) .art { animation:float 3.2s ease-in-out infinite; filter:drop-shadow(0 8px 14px rgba(0,0,0,.45)); }
+  @keyframes float { 50% { transform:translateY(-6px); } }
+  .tro:not(.locked)::before { content:''; position:absolute; top:-60%; left:-60%; width:60%; height:220%; transform:rotate(20deg);
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent); animation:sheen 4.5s ease-in-out infinite; pointer-events:none; }
+  @keyframes sheen { 0%, 55% { left:-60%; } 100% { left:140%; } }
+  .tro h3 { margin:2px 0 0; font-family:'Prompt',sans-serif; font-size:16px; font-weight:600; color:inherit; }
+  .tro .act { font-size:12.5px; opacity:.85; margin-top:2px; line-height:1.4; }
+  .tro .win { margin-top:8px; font-family:'Prompt',sans-serif; font-weight:600; font-size:15px; color:#ffe9a8; }
+  .tro .tier { display:inline-block; margin-top:6px; font-size:11.5px; font-weight:700; padding:2px 10px; border-radius:99px; background:rgba(255,255,255,.14); }
+  .tro .xp { position:absolute; top:10px; right:10px; font-size:11px; font-weight:800; color:#7cf29a; }
+  .tro.locked .lockmsg { margin-top:8px; font-size:12.5px; }
+  /* แบดจ์ความสำเร็จของห้อง */
+  .badges { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:10px; }
+  .badge { display:flex; gap:12px; align-items:center; border:1px solid var(--line); border-radius:14px; padding:10px 12px; background:#fff; }
+  .badge .ic { width:52px; height:52px; flex:none; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:28px;
+    background:radial-gradient(circle at 35% 30%, #fff5cc, #e8b923 70%, #b8860b); box-shadow:0 0 0 3px #fff, 0 0 0 5px #e8b923; }
+  .badge.locked .ic { background:#e4e7ee; box-shadow:0 0 0 3px #fff, 0 0 0 5px #cfd5df; filter:grayscale(1); opacity:.6; }
+  .badge b { display:block; font-family:'Prompt',sans-serif; font-weight:600; font-size:15px; }
+  .badge small { display:block; color:var(--text-2); font-size:12.5px; line-height:1.45; }
+  .badge .rooms { color:var(--navy); font-weight:700; font-size:13px; margin-top:2px; display:block; }
+  .badge.locked b, .badge.locked .rooms { color:var(--muted); }
+  /* ป๊อปอัป "ปลดล็อกความสำเร็จ" แบบเกม */
+  .unlock { position:fixed; left:50%; bottom:22px; z-index:70; transform:translate(-50%, 160%); display:flex; align-items:center; gap:12px;
+    background:linear-gradient(90deg, #0b1f4d, #14377e); color:#fff; border:2px solid #e8b923; border-radius:999px; padding:8px 20px 8px 8px;
+    box-shadow:0 10px 30px rgba(0,0,0,.35); transition:transform .5s cubic-bezier(.2,1.4,.4,1); max-width:94vw; }
+  .unlock.show { transform:translate(-50%, 0); }
+  .unlock .ring { width:52px; height:52px; border-radius:50%; background:#0a1d47; border:2px solid #e8b923; display:flex; align-items:center; justify-content:center; flex:none; animation:ping 1s ease-in-out 3; }
+  @keyframes ping { 50% { box-shadow:0 0 0 10px rgba(232,185,35,.25); } }
+  .unlock .ring svg { width:36px; height:45px; }
+  .unlock small { display:block; font-size:11px; font-weight:800; letter-spacing:.5px; color:#ffd56b; }
+  .unlock b { display:block; font-family:'Prompt',sans-serif; font-size:15px; font-weight:600; }
+  @media (prefers-reduced-motion: reduce) { .tro .art, .tro::before, .unlock .ring { animation:none !important; } }
+
+  #tip { position:fixed; z-index:60; pointer-events:none; background:#1b1f29; color:#fff; font-size:13px; padding:7px 10px; border-radius:8px; max-width:260px; line-height:1.5; box-shadow:0 4px 14px rgba(0,0,0,.25); }
+  @media (max-width:640px) {
+    .place, .block, .block .top { width:92px; }
+    .block .front { font-size:34px; }
+    .who b { font-size:16px; } .who .medal { font-size:32px; }
+    .podium { gap:8px; }
+    .rrow { grid-template-columns:34px 58px 1fr 92px; gap:6px; }
+  }
+</style>
+<link rel="stylesheet" href="theme.css">
+<link rel="icon" href="logo-mark.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <a class="brand" href="index.html"><img src="logo-mark.png" alt="ตรามหาวิทยาลัยการกีฬาแห่งชาติ"><span><b>คณะพลศึกษา</b><small>มหาวิทยาลัยการกีฬาแห่งชาติ วิทยาเขตอุดรธานี</small></span></a>
+  <nav aria-label="เมนูหลัก"><a href="index.html">หน้าแรก</a><a href="register.html">ลงทะเบียนรูป</a><a href="myqr.html">QR ของฉัน</a><a href="leaderboard.html" aria-current="page">🏆 อันดับห้อง</a><a href="scan.html">สแกนเช็คชื่อ</a><a href="activities.html">จัดการกิจกรรม</a><a href="dashboard.html">Dashboard</a></nav>
+</div></header>
+<section class="band"><div class="wrap"><div class="titles"><div class="crumb"><a href="index.html">หน้าแรก</a> › อันดับห้อง</div><h1>🏆 ตารางอันดับห้องเรียน</h1><p id="bandSub">ห้องไหนเข้าร่วมกิจกรรมมากที่สุด</p></div></div></section>
+
+<main>
+  <div class="bar">
+    <button class="tab" role="tab" data-tab="att" aria-selected="true">🏃 เข้าร่วมกิจกรรม</button>
+    <button class="tab" role="tab" data-tab="reg" aria-selected="false">🖼️ ส่งรูปถ่าย</button>
+    <span class="sp"></span>
+    <span class="muted">ชั้นปี:</span>
+    <button class="chip" data-y="" aria-pressed="true">ทั้งคณะ</button>
+    <button class="chip" data-y="1" aria-pressed="false">ปี 1</button>
+    <button class="chip" data-y="2" aria-pressed="false">ปี 2</button>
+    <button class="chip" data-y="3" aria-pressed="false">ปี 3</button>
+    <button class="chip" data-y="4" aria-pressed="false">ปี 4</button>
+  </div>
+
+  <section class="stage" id="stage" aria-live="polite">
+    <div class="spot l"></div><div class="spot r"></div>
+    <h2 id="stageTitle">🏆 Top 3</h2><p class="sub" id="stageSub"></p>
+    <div class="scene"><div class="podium" id="podium"></div></div>
+    <div class="floor"></div>
+    <div class="confetti" id="confetti"></div>
+  </section>
+
+
+  <section class="card" id="trophyCard">
+    <h2>🏆 ถ้วยรางวัลประจำกิจกรรม</h2>
+    <p class="sub">ทุกกิจกรรมมีถ้วยรางวัลของตัวเอง ลวดลายตามประเภทกิจกรรม — ปลดล็อกเมื่อปิดเช็คชื่อ ห้องที่มีร้อยละผู้เข้าร่วมสูงสุดได้ครองถ้วย (เสมอกันครองร่วมกัน) ·
+      ระดับถ้วยตามร้อยละของห้องผู้ชนะ: 💎 แพลทินัม 100% · 🥇 ทอง ≥ 90% · 🥈 เงิน ≥ 80% · 🥉 ทองแดง ต่ำกว่า 80%</p>
+    <div class="trophies" id="trophies"></div>
+  </section>
+
+  <section class="card" id="badgeCard">
+    <h2>🎖️ ความสำเร็จของห้อง (Achievements)</h2>
+    <p class="sub">ภารกิจพิเศษที่ปลดล็อกได้ตลอดภาคเรียน — ห้องที่ทำสำเร็จจะมีชื่อขึ้นในแบดจ์</p>
+    <div class="badges" id="badges"></div>
+  </section>
+
+  <section class="card">
+    <h2>📋 อันดับทุกห้อง</h2>
+    <p class="sub" id="rankSub"></p>
+    <div class="rank" id="rank"></div>
+    <p class="note" id="rankNote"></p>
+  </section>
+
+  <section class="card" id="trendCard">
+    <h2>📈 แนวโน้มการเข้าร่วมรายกิจกรรม (ค่าเฉลี่ยรายชั้นปี)</h2>
+    <p class="sub">ร้อยละของนักศึกษาที่เข้าร่วมในแต่ละกิจกรรมที่ปิดแล้ว เรียงตามวันที่จัด</p>
+    <div class="legend" id="trendLegend"></div>
+    <div class="chartwrap"><svg id="trend" role="img" aria-label="กราฟเส้นแนวโน้มการเข้าร่วม"></svg></div>
+  </section>
+
+  <section class="card" id="boxCard">
+    <h2>📦 การกระจายของร้อยละการเข้าร่วมรายห้อง (Box plot)</h2>
+    <p class="sub">กล่อง = ช่วงควอร์ไทล์ที่ 1–3 (Q1–Q3) · เส้นกลางกล่อง = มัธยฐาน · หนวด = ค่าต่ำสุด–สูงสุดที่ไม่เกิน 1.5×IQR · จุด = ค่าผิดปกติ (outlier) · ◆ = ค่าเฉลี่ย · เส้นประ = เกณฑ์ผ่าน 80%</p>
+    <div class="chartwrap"><svg id="box" role="img" aria-label="แผนภาพกล่องรายห้อง"></svg></div>
+  </section>
+
+  <section class="card">
+    <h2>🧮 สถิติเชิงพรรณนาและการทดสอบสมมติฐาน</h2>
+    <p class="sub" id="statSub"></p>
+    <div class="chartwrap"><table id="statTable"></table></div>
+    <div class="test" id="tests"></div>
+    <p class="note" id="statNote"></p>
+  </section>
+
+  <p class="muted" id="stamp" style="text-align:center"></p>
+</main>
+<div id="tip" class="hidden" role="tooltip"></div>
+<div class="unlock" id="unlock" role="status" aria-live="polite"><span class="ring" id="unlockArt"></span><span><small>🏆 ACHIEVEMENT UNLOCKED · ปลดล็อกความสำเร็จ</small><b id="unlockText"></b></span></div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const f1 = x => (Math.round(x * 10) / 10).toFixed(1), f2 = x => x.toFixed(2), f3 = x => x.toFixed(3);
+  const fp = p => p < 0.001 ? '< .001' : '= ' + p.toFixed(3).replace(/^0/, '');
+  const TH_MONTH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const thDate = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? +m[3] + ' ' + TH_MONTH[+m[2] - 1] : ''; };
+  const YEAR_COLOR = { '1': 'var(--s1)', '2': 'var(--s2)', '3': 'var(--s3)', '4': 'var(--s4)' };
+
+  // =================== ฟังก์ชันสถิติ (Numerical Recipes) ===================
+  function gammaln(x) {
+    const c = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+    let y = x, tmp = x + 5.5; tmp -= (x + 0.5) * Math.log(tmp);
+    let ser = 1.000000000190015; for (let j = 0; j < 6; j++) ser += c[j] / ++y;
+    return -tmp + Math.log(2.5066282746310005 * ser / x);
+  }
+  function betacf(a, b, x) {
+    const MAXIT = 200, EPS = 3e-14, FPMIN = 1e-300;
+    let qab = a + b, qap = a + 1, qam = a - 1, c = 1, d = 1 - qab * x / qap;
+    if (Math.abs(d) < FPMIN) d = FPMIN; d = 1 / d; let h = d;
+    for (let m = 1; m <= MAXIT; m++) {
+      const m2 = 2 * m; let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN; c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN; d = 1 / d; h *= d * c;
+      aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN; c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN; d = 1 / d;
+      const del = d * c; h *= del; if (Math.abs(del - 1) < EPS) break;
+    }
+    return h;
+  }
+  function ibeta(x, a, b) {   // regularized incomplete beta I_x(a,b)
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    const bt = Math.exp(gammaln(a + b) - gammaln(a) - gammaln(b) + a * Math.log(x) + b * Math.log(1 - x));
+    return x < (a + 1) / (a + b + 2) ? bt * betacf(a, b, x) / a : 1 - bt * betacf(b, a, 1 - x) / b;
+  }
+  function gammq(a, x) {   // upper regularized gamma Q(a,x)
+    if (x <= 0) return 1;
+    if (x < a + 1) { let ap = a, sum = 1 / a, del = sum; for (let n = 0; n < 500; n++) { ap++; del *= x / ap; sum += del; if (Math.abs(del) < Math.abs(sum) * 3e-14) break; }
+      return 1 - sum * Math.exp(-x + a * Math.log(x) - gammaln(a)); }
+    let b = x + 1 - a, c = 1 / 1e-300, d = 1 / b, h = d;
+    for (let i = 1; i < 500; i++) { const an = -i * (i - a); b += 2; d = an * d + b; if (Math.abs(d) < 1e-300) d = 1e-300; c = b + an / c; if (Math.abs(c) < 1e-300) c = 1e-300; d = 1 / d; const del = d * c; h *= del; if (Math.abs(del - 1) < 3e-14) break; }
+    return Math.exp(-x + a * Math.log(x) - gammaln(a)) * h;
+  }
+  const pF = (F, d1, d2) => ibeta(d2 / (d2 + d1 * F), d2 / 2, d1 / 2);          // P(F > f)
+  const pChi = (x, df) => gammq(df / 2, x / 2);                                  // P(χ² > x)
+  const tCdf = (t, df) => 1 - 0.5 * ibeta(df / (df + t * t), df / 2, 0.5);       // t ≥ 0
+  function tCrit(df) { let lo = 0, hi = 100; for (let i = 0; i < 80; i++) { const m = (lo + hi) / 2; tCdf(m, df) < 0.975 ? lo = m : hi = m; } return (lo + hi) / 2; }
+  function quantile(sorted, p) { if (!sorted.length) return NaN; const i = (sorted.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo); }
+  function describe(xs) {
+    const n = xs.length, s = xs.slice().sort((a, b) => a - b);
+    const mean = n ? s.reduce((a, b) => a + b, 0) / n : NaN;
+    const sd = n > 1 ? Math.sqrt(s.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)) : 0;
+    const half = n > 1 ? tCrit(n - 1) * sd / Math.sqrt(n) : 0;
+    return { n, mean, sd, lo: Math.max(0, mean - half), hi: Math.min(100, mean + half), q1: quantile(s, .25), med: quantile(s, .5), q3: quantile(s, .75), min: s[0], max: s[n - 1], sorted: s };
+  }
+  function wilson(k, n) {   // ช่วงความเชื่อมั่น 95% ของสัดส่วน (Wilson score)
+    if (!n) return { p: 0, lo: 0, hi: 0 };
+    const z = 1.959964, p = k / n, d = 1 + z * z / n, c = (p + z * z / (2 * n)) / d, h = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d;
+    return { p: p * 100, lo: Math.max(0, c - h) * 100, hi: Math.min(1, c + h) * 100 };
+  }
+  function anova(groups) {   // One-way ANOVA + η²
+    const all = groups.flat(), N = all.length, k = groups.length, gm = all.reduce((a, b) => a + b, 0) / N;
+    let ssb = 0, ssw = 0;
+    groups.forEach(g => { const m = g.reduce((a, b) => a + b, 0) / g.length; ssb += g.length * (m - gm) ** 2; g.forEach(x => { ssw += (x - m) ** 2; }); });
+    const df1 = k - 1, df2 = N - k;
+    if (df1 < 1 || df2 < 1 || ssw === 0) return null;
+    const F = (ssb / df1) / (ssw / df2);
+    return { F, df1, df2, p: pF(F, df1, df2), eta2: ssb / (ssb + ssw) };
+  }
+  function kruskal(groups) {   // Kruskal–Wallis H (ปรับค่าซ้ำ) + ε²
+    const all = []; groups.forEach((g, gi) => g.forEach(v => all.push({ v, gi })));
+    const N = all.length, k = groups.length; if (k < 2 || N <= k) return null;
+    all.sort((a, b) => a.v - b.v);
+    let T = 0;
+    for (let i = 0; i < N;) { let j = i; while (j + 1 < N && all[j + 1].v === all[i].v) j++; const r = (i + j) / 2 + 1, t = j - i + 1; T += t ** 3 - t; for (let m = i; m <= j; m++) all[m].r = r; i = j + 1; }
+    const R = new Array(k).fill(0); all.forEach(o => { R[o.gi] += o.r; });
+    let H = 12 / (N * (N + 1)) * groups.reduce((s, g, i) => s + R[i] * R[i] / g.length, 0) - 3 * (N + 1);
+    const corr = 1 - T / (N ** 3 - N); if (corr > 0) H /= corr;
+    if (!isFinite(H)) return null;
+    return { H, df: k - 1, p: pChi(H, k - 1), eps2: H / (N - 1) };
+  }
+  function chiSquare(rows) {   // rows = [[ส่ง, ไม่ส่ง], ...] → χ² test of independence + Cramér's V
+    const r = rows.filter(x => x[0] + x[1] > 0), k = r.length; if (k < 2) return null;
+    const c0 = r.reduce((a, x) => a + x[0], 0), c1 = r.reduce((a, x) => a + x[1], 0), N = c0 + c1;
+    if (!c0 || !c1) return null;
+    let chi = 0, small = 0;
+    r.forEach(x => { const n = x[0] + x[1]; [[x[0], n * c0 / N], [x[1], n * c1 / N]].forEach(([o, e]) => { chi += (o - e) ** 2 / e; if (e < 5) small++; }); });
+    const df = k - 1;
+    return { chi, df, p: pChi(chi, df), V: Math.sqrt(chi / N), small, cells: k * 2 };
+  }
+
+  // =================== โหลดข้อมูล ===================
+  let DATA = null, TAB = 'att', YEAR = '';
+  const hasPct = () => DATA.rooms.some(r => r.pcts.length);
+  function load() {
+    $('stageSub').textContent = 'กำลังโหลดข้อมูล…';
+    google.script.run.withSuccessHandler(r => {
+      DATA = r;
+      if (!r.rooms.some(x => x.pcts.length)) TAB = 'reg';   // ยังไม่มีกิจกรรมที่ปิด — เริ่มที่อันดับส่งรูป
+      syncTabs(); render();
+    }).withFailureHandler(e => { $('stageSub').textContent = 'โหลดข้อมูลไม่ได้: ' + e.message; }).publicStats();
+  }
+  function syncTabs() { document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === TAB))); }
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => { TAB = t.dataset.tab; syncTabs(); render(); });
+  document.querySelectorAll('.chip').forEach(c => c.onclick = () => {
+    YEAR = c.dataset.y; document.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x === c))); render();
+  });
+
+  // ได้คะแนนรายห้องตามแท็บ: score + ช่วงความเชื่อมั่น 95%
+  function scored() {
+    const rooms = DATA.rooms.filter(r => !YEAR || r.year === YEAR);
+    return rooms.map(r => {
+      if (TAB === 'reg') { const w = wilson(r.sent, r.n); return { r, score: w.p, lo: w.lo, hi: w.hi, label: r.sent + '/' + r.n + ' คน' }; }
+      const d = describe(r.pcts);
+      return { r, d, score: d.n ? d.mean : NaN, lo: d.lo, hi: d.hi, label: 'n = ' + d.n };
+    }).filter(x => !isNaN(x.score))
+      .sort((a, b) => b.score - a.score || b.r.n - a.r.n);
+  }
+  // อันดับแบบกีฬา: คะแนนเท่ากัน (ทศนิยม 1 ตำแหน่ง) ได้อันดับร่วม แล้วข้ามอันดับถัดไป (1, 1, 3)
+  function withRanks(list) { list.forEach((x, i) => { x.rank = i && f1(x.score) === f1(list[i - 1].score) ? list[i - 1].rank : i + 1; }); return list; }
+
+  function render() {
+    const att = TAB === 'att', list = withRanks(scored());
+    $('bandSub').textContent = att ? 'ห้องไหนเข้าร่วมกิจกรรมมากที่สุด · ภาคเรียน ' + DATA.term : 'ห้องไหนส่งรูปถ่ายครบเร็วที่สุด · กำหนดส่ง 19 ต.ค. 2569';
+    $('stamp').textContent = 'ข้อมูล ณ ' + thDate(DATA.generatedAt) + ' ' + String(+DATA.generatedAt.slice(0, 4) + 543) + ' เวลา ' + DATA.generatedAt.slice(11) + ' น. (อัปเดตทุก 10 นาที) · ไม่มีชื่อหรือรหัสนักศึกษาในหน้านี้';
+    renderPodium(list, att); renderTrophies(); renderBadges(); renderRank(list, att); renderTrend(att); renderBox(list, att); renderStats(list, att);
+  }
+
+  // =================== โพเดียม 3 มิติ ===================
+  function renderPodium(list, att) {
+    $('stageTitle').textContent = att ? '🏆 แชมป์การเข้าร่วมกิจกรรม' : '🏆 แชมป์ส่งรูปถ่ายเร็วที่สุด';
+    if (att && !hasPct()) {
+      $('stageSub').textContent = '';
+      $('podium').innerHTML = '<div class="empty">ยังไม่มีกิจกรรมที่ปิดแล้วในภาคเรียนนี้<br>อันดับจะเริ่มเมื่อปิดกิจกรรมแรก — ระหว่างนี้ดูแท็บ "🖼️ ส่งรูปถ่าย" ได้</div>';
+      $('confetti').innerHTML = ''; return;
+    }
+    $('stageSub').textContent = (YEAR ? 'ชั้นปีที่ ' + YEAR : 'ทั้งคณะ') + ' · ' + (att ? 'ค่าเฉลี่ยร้อยละการเข้าร่วม' : 'ร้อยละที่ส่งรูปแล้ว');
+    const top = list.slice(0, 3);
+    const order = [[top[1], 'p2', '🥈'], [top[0], 'p1', '🥇'], [top[2], 'p3', '🥉']];
+    $('podium').innerHTML = order.map(([x, cls, medal]) => x ?
+      '<div class="place ' + cls + '"><div class="who"><span class="medal">' + medal + '</span><b>ปี ' + esc(x.r.room) + '</b><small>' + f1(x.score) + '%</small></div>' +
+      '<div class="block"><i class="side l"></i><i class="side"></i><i class="top"></i><i class="front">' + x.rank + '</i></div></div>'
+      : '<div class="place ' + cls + '" style="opacity:.25"><div class="block"><i class="front">–</i></div></div>').join('');
+    // โปรยกระดาษสี (สร้างใหม่ทุกครั้งที่เปลี่ยนแท็บ/ชั้นปี เพื่อให้แอนิเมชันเริ่มใหม่)
+    const colors = ['#e8b923', '#ffffff', '#ef4444', '#3b82f6', '#22c55e'];
+    $('confetti').innerHTML = Array.from({ length: 46 }, (_, i) =>
+      '<b style="left:' + (Math.random() * 100) + '%;background:' + colors[i % colors.length] + ';--t:' + (3.5 + Math.random() * 3) + 's;--dl:' + (-Math.random() * 6) + 's;--x:' + (Math.random() * 120 - 60) + 'px;--r:' + (360 + Math.random() * 720) + 'deg"></b>').join('');
+    // เล่นแอนิเมชันกล่องขึ้นใหม่
+    $('podium').querySelectorAll('.block,.who').forEach(el => { el.style.animation = 'none'; el.offsetHeight; el.style.animation = ''; });
+  }
+
+  // =================== อันดับทุกห้อง ===================
+  function renderRank(list, att) {
+    $('rankSub').textContent = att
+      ? 'คะแนน = ค่าเฉลี่ยร้อยละการเข้าร่วมกิจกรรมของนักศึกษาในห้อง · เส้นดำ = ช่วงความเชื่อมั่น 95% ของค่าเฉลี่ย (t-distribution) · เส้นตั้ง = เกณฑ์ผ่าน ' + DATA.passPercent + '%'
+      : 'คะแนน = ร้อยละของนักศึกษาในห้องที่ส่งรูปแล้ว · เส้นดำ = ช่วงความเชื่อมั่น 95% (Wilson score interval)';
+    if (!list.length) { $('rank').innerHTML = '<p class="muted">ยังไม่มีข้อมูล</p>'; $('rankNote').textContent = ''; return; }
+    const medal = { 1: '🥇', 2: '🥈', 3: '🥉' };
+    $('rank').innerHTML = list.map(x =>
+      '<div class="rrow' + (x.rank <= 3 ? ' top' : '') + '"><span class="no">' + (medal[x.rank] || x.rank) + '</span><span class="rm">ปี ' + esc(x.r.room) + '</span>' +
+      '<div class="track" data-tip="' + esc('ปี ' + x.r.room + ' · อันดับ ' + x.rank + ': ' + f1(x.score) + '% (95% CI ' + f1(x.lo) + '–' + f1(x.hi) + ') · ' + x.label) + '">' +
+      '<span class="fill" style="width:' + Math.min(100, x.score) + '%"></span>' +
+      (att ? '<span class="goal" style="left:' + DATA.passPercent + '%"></span>' : '') +
+      '<span class="ci" style="left:' + x.lo + '%;width:' + Math.max(0.5, x.hi - x.lo) + '%"></span></div>' +
+      '<span class="val"><b>' + f1(x.score) + '%</b><small>' + esc(x.label) + '</small></span></div>').join('');
+    const overlap = list.length > 1 && list[1].hi >= list[0].lo;
+    $('rankNote').textContent = 'อันดับเท่ากันเมื่อคะแนน (ทศนิยม 1 ตำแหน่ง) เท่ากัน แบบการจัดอันดับกีฬา (1, 1, 3) · ' +
+      (overlap ? 'ช่วงความเชื่อมั่นของอันดับ 1 และ 2 ซ้อนทับกัน แปลว่าคะแนนยังสูสี ยังไม่อาจสรุปได้ว่าต่างกันจริงทางสถิติ' : 'ช่วงความเชื่อมั่นของอันดับ 1 ไม่ซ้อนกับอันดับ 2 — นำห่างชัดเจน');
+  }
+
+  // =================== กราฟเส้นแนวโน้ม ===================
+  function renderTrend(att) {
+    const acts = DATA.activities;
+    $('trendCard').classList.toggle('hidden', !att || acts.length < 1);
+    if (!att || !acts.length) return;
+    const years = (YEAR ? [YEAR] : ['1', '2', '3', '4']);
+    const series = years.map(y => {
+      const rooms = DATA.rooms.filter(r => r.year === y);
+      const pts = acts.map((a, i) => {
+        let w = 0, s = 0; rooms.forEach(r => { if (r.acts[i] != null) { s += r.acts[i] * r.n; w += r.n; } });
+        return w ? s / w : null;
+      });
+      return { y, pts };
+    }).filter(s => s.pts.some(v => v != null));
+    const W = Math.max(560, acts.length * 90 + 100), H = 260, L = 44, R = 60, T = 14, B = 46;
+    const x = i => L + (acts.length === 1 ? (W - L - R) / 2 : i * (W - L - R) / (acts.length - 1)), yv = v => T + (100 - v) * (H - T - B) / 100;
+    let g = '';
+    [0, 20, 40, 60, 80, 100].forEach(v => { g += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + yv(v) + '" y2="' + yv(v) + '"/><text x="' + (L - 6) + '" y="' + (yv(v) + 4) + '" text-anchor="end">' + v + '%</text>'; });
+    g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yv(DATA.passPercent) + '" y2="' + yv(DATA.passPercent) + '" stroke="#7a8193" stroke-dasharray="5 4"/>';
+    acts.forEach((a, i) => { g += '<text x="' + x(i) + '" y="' + (H - B + 18) + '" text-anchor="middle">' + esc(thDate(a.date)) + '</text><text x="' + x(i) + '" y="' + (H - B + 34) + '" text-anchor="middle" font-size="11">' + esc(a.name.slice(0, 14)) + '</text>'; });
+    series.forEach(s => {
+      const pts = s.pts.map((v, i) => v == null ? null : [x(i), yv(v), v, i]).filter(Boolean);
+      g += '<polyline fill="none" stroke="' + YEAR_COLOR[s.y] + '" stroke-width="2" stroke-linejoin="round" points="' + pts.map(p => p[0] + ',' + p[1]).join(' ') + '"/>';
+      pts.forEach(p => { g += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="5" fill="' + YEAR_COLOR[s.y] + '" stroke="#fff" stroke-width="2" data-tip="' + esc('ปี ' + s.y + ' · ' + acts[p[3]].name + ': ' + f1(p[2]) + '%') + '"/><circle cx="' + p[0] + '" cy="' + p[1] + '" r="12" fill="transparent" data-tip="' + esc('ปี ' + s.y + ' · ' + acts[p[3]].name + ': ' + f1(p[2]) + '%') + '"/>'; });
+      const last = pts[pts.length - 1]; if (last) g += '<text x="' + (last[0] + 10) + '" y="' + (last[1] + 4) + '" font-weight="700">ปี ' + s.y + '</text>';
+    });
+    const svg = $('trend'); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.setAttribute('width', W); svg.setAttribute('height', H); svg.innerHTML = g;
+    $('trendLegend').innerHTML = series.map(s => '<span><i style="background:' + YEAR_COLOR[s.y] + '"></i>ชั้นปีที่ ' + s.y + '</span>').join('') + '<span><i style="background:#7a8193"></i>เกณฑ์ผ่าน 80%</span>';
+  }
+
+  // =================== Box plot ===================
+  function renderBox(list, att) {
+    $('boxCard').classList.toggle('hidden', !att || !hasPct());
+    if (!att || !hasPct()) return;
+    const rooms = list.slice().sort((a, b) => a.r.room.localeCompare(b.r.room, 'en', { numeric: true }));
+    const W = Math.max(560, rooms.length * 52 + 70), H = 280, L = 44, T = 12, B = 34, bw = 26;
+    const yv = v => T + (100 - v) * (H - T - B) / 100, cx = i => L + 30 + i * ((W - L - 30) / rooms.length);
+    let g = '';
+    [0, 20, 40, 60, 80, 100].forEach(v => { g += '<line class="grid" x1="' + L + '" x2="' + W + '" y1="' + yv(v) + '" y2="' + yv(v) + '"/><text x="' + (L - 6) + '" y="' + (yv(v) + 4) + '" text-anchor="end">' + v + '%</text>'; });
+    g += '<line x1="' + L + '" x2="' + W + '" y1="' + yv(DATA.passPercent) + '" y2="' + yv(DATA.passPercent) + '" stroke="#7a8193" stroke-dasharray="5 4"/>';
+    rooms.forEach((x, i) => {
+      const d = x.d, c = cx(i), iqr = d.q3 - d.q1;
+      const lowW = d.sorted.find(v => v >= d.q1 - 1.5 * iqr), highW = d.sorted.slice().reverse().find(v => v <= d.q3 + 1.5 * iqr);
+      const tip = esc('ปี ' + x.r.room + ' (n = ' + d.n + ') · มัธยฐาน ' + f1(d.med) + '% · Q1–Q3 ' + f1(d.q1) + '–' + f1(d.q3) + '% · ค่าเฉลี่ย ' + f1(d.mean) + '%');
+      g += '<line x1="' + c + '" x2="' + c + '" y1="' + yv(highW) + '" y2="' + yv(d.q3) + '" stroke="#52596a"/><line x1="' + c + '" x2="' + c + '" y1="' + yv(d.q1) + '" y2="' + yv(lowW) + '" stroke="#52596a"/>';
+      g += '<line x1="' + (c - 7) + '" x2="' + (c + 7) + '" y1="' + yv(highW) + '" y2="' + yv(highW) + '" stroke="#52596a"/><line x1="' + (c - 7) + '" x2="' + (c + 7) + '" y1="' + yv(lowW) + '" y2="' + yv(lowW) + '" stroke="#52596a"/>';
+      g += '<rect x="' + (c - bw / 2) + '" y="' + yv(d.q3) + '" width="' + bw + '" height="' + Math.max(2, yv(d.q1) - yv(d.q3)) + '" rx="4" fill="' + YEAR_COLOR[x.r.year] + '" fill-opacity=".28" stroke="' + YEAR_COLOR[x.r.year] + '" stroke-width="2" data-tip="' + tip + '"/>';
+      g += '<line x1="' + (c - bw / 2) + '" x2="' + (c + bw / 2) + '" y1="' + yv(d.med) + '" y2="' + yv(d.med) + '" stroke="#1b1f29" stroke-width="2"/>';
+      g += '<path d="M' + c + ' ' + (yv(d.mean) - 5) + 'l5 5-5 5-5-5z" fill="#1b1f29" data-tip="' + tip + '"/>';
+      d.sorted.filter(v => v < lowW || v > highW).forEach(v => { g += '<circle cx="' + c + '" cy="' + yv(v) + '" r="3" fill="none" stroke="#52596a"/>'; });
+      g += '<text x="' + c + '" y="' + (H - 12) + '" text-anchor="middle" font-weight="600">' + esc(x.r.room) + '</text>';
+    });
+    const svg = $('box'); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.setAttribute('width', W); svg.setAttribute('height', H); svg.innerHTML = g;
+  }
+
+  // =================== ตารางสถิติ + การทดสอบ ===================
+  function renderStats(list, att) {
+    const rooms = list.slice().sort((a, b) => a.r.room.localeCompare(b.r.room, 'en', { numeric: true }));
+    const scope = YEAR ? 'ชั้นปีที่ ' + YEAR : 'ทั้งคณะ';
+    if (att) {
+      if (!hasPct()) {
+        $('statSub').textContent = 'ยังไม่มีกิจกรรมที่ปิดแล้ว — สถิติจะแสดงเมื่อปิดกิจกรรมแรก';
+        $('statTable').innerHTML = ''; $('tests').innerHTML = ''; $('statNote').textContent = ''; return;
+      }
+      $('statSub').textContent = 'ตัวแปร: ร้อยละการเข้าร่วมกิจกรรมของนักศึกษารายบุคคล (คิดจากกิจกรรมที่ปิดแล้วและนับในร้อยละ ' + DATA.activities.filter(a => a.countable).length + ' กิจกรรม) จำแนกตามห้อง · ' + scope;
+      $('statTable').innerHTML = '<thead><tr><th>ห้อง</th><th>n</th><th>Mean</th><th>SD</th><th>95% CI</th><th>Median</th><th>IQR (Q1–Q3)</th><th>Min–Max</th><th>ผ่าน ≥80%</th></tr></thead><tbody>' +
+        rooms.map(x => { const d = x.d, pass = d.sorted.filter(v => v >= DATA.passPercent).length;
+          return '<tr><td>ปี ' + esc(x.r.room) + '</td><td>' + d.n + '</td><td>' + f2(d.mean) + '</td><td>' + f2(d.sd) + '</td><td>' + f1(d.lo) + '–' + f1(d.hi) + '</td><td>' + f1(d.med) + '</td><td>' + f1(d.q1) + '–' + f1(d.q3) + '</td><td>' + f1(d.min) + '–' + f1(d.max) + '</td><td>' + pass + ' (' + f1(pass * 100 / d.n) + '%)</td></tr>'; }).join('') + '</tbody>';
+      const groups = rooms.map(x => x.d.sorted).filter(g => g.length >= 2);
+      const a = anova(groups), k = kruskal(groups);
+      const verdict = p => p < .05 ? '<span class="sig">แตกต่างกันอย่างมีนัยสำคัญทางสถิติที่ระดับ .05</span>' : '<span class="ns">ไม่แตกต่างกันอย่างมีนัยสำคัญทางสถิติที่ระดับ .05</span>';
+      const effEta = e => e >= .14 ? 'ขนาดใหญ่' : e >= .06 ? 'ขนาดกลาง' : e >= .01 ? 'ขนาดเล็ก' : 'น้อยมาก';
+      $('tests').innerHTML = (a ? '<b>One-way ANOVA</b> — H₀: ค่าเฉลี่ยร้อยละการเข้าร่วมของทุกห้องเท่ากัน<br>F(' + a.df1 + ', ' + a.df2 + ') = ' + f2(a.F) + ', p ' + fp(a.p) + ', η² = ' + f3(a.eta2) +
+          ' (ขนาดอิทธิพล' + effEta(a.eta2) + ') → ' + verdict(a.p) + '<br>' : 'ข้อมูลยังไม่พอสำหรับ ANOVA (ต้องมีอย่างน้อย 2 ห้อง ห้องละ ≥ 2 คน และค่าไม่เท่ากันทั้งหมด)<br>') +
+        (k ? '<b>Kruskal–Wallis H test</b> (ไม่อิงพารามิเตอร์ ใช้ยืนยันเมื่อข้อมูลไม่แจกแจงปกติ)<br>H(' + k.df + ') = ' + f2(k.H) + ', p ' + fp(k.p) + ', ε² = ' + f3(k.eps2) + ' → ' + verdict(k.p) : '');
+      $('statNote').textContent = 'หมายเหตุ: ร้อยละการเข้าร่วมมักเบ้และมีค่าซ้ำมาก (เช่น 100%) จึงรายงานทั้ง ANOVA และ Kruskal–Wallis — หากผลขัดกัน ให้ยึด Kruskal–Wallis · ' +
+        'η² และ ε²: ≥ .01 เล็ก, ≥ .06 กลาง, ≥ .14 ใหญ่ (Cohen, 1988) · ช่วงความเชื่อมั่น 95% ใช้การแจกแจง t · ข้อมูลเป็นประชากรทั้งห้อง ผลการทดสอบจึงใช้ประกอบการอธิบายความแตกต่าง ไม่ใช่การอนุมานไปยังประชากรอื่น';
+    } else {
+      $('statSub').textContent = 'ตัวแปร: สถานะการส่งรูปถ่าย (ส่งแล้ว / ยังไม่ส่ง) จำแนกตามห้อง · ' + scope;
+      $('statTable').innerHTML = '<thead><tr><th>ห้อง</th><th>n</th><th>ส่งแล้ว</th><th>อนุมัติแล้ว</th><th>ยังไม่ส่ง</th><th>สัดส่วนส่งแล้ว</th><th>95% CI (Wilson)</th></tr></thead><tbody>' +
+        rooms.map(x => { const r = x.r, w = wilson(r.sent, r.n);
+          return '<tr><td>ปี ' + esc(r.room) + '</td><td>' + r.n + '</td><td>' + r.sent + '</td><td>' + r.approved + '</td><td>' + (r.n - r.sent) + '</td><td>' + f1(w.p) + '%</td><td>' + f1(w.lo) + '–' + f1(w.hi) + '%</td></tr>'; }).join('') + '</tbody>';
+      const c = chiSquare(rooms.map(x => [x.r.sent, x.r.n - x.r.sent]));
+      const effV = (v, df) => { const s = Math.min(df, 1); return v >= .5 / Math.sqrt(s) ? 'ขนาดใหญ่' : v >= .3 / Math.sqrt(s) ? 'ขนาดกลาง' : v >= .1 ? 'ขนาดเล็ก' : 'น้อยมาก'; };
+      $('tests').innerHTML = c ? '<b>Chi-square test of independence</b> — H₀: สัดส่วนการส่งรูปไม่ขึ้นกับห้อง<br>χ²(' + c.df + ', N = ' + rooms.reduce((a, x) => a + x.r.n, 0) + ') = ' + f2(c.chi) + ', p ' + fp(c.p) +
+        ', Cramér\'s V = ' + f3(c.V) + ' (ขนาดอิทธิพล' + effV(c.V, c.df) + ') → ' +
+        (c.p < .05 ? '<span class="sig">สัดส่วนการส่งรูปแตกต่างกันระหว่างห้องอย่างมีนัยสำคัญทางสถิติที่ระดับ .05</span>' : '<span class="ns">สัดส่วนการส่งรูปไม่แตกต่างกันระหว่างห้องอย่างมีนัยสำคัญที่ระดับ .05</span>') +
+        (c.small ? '<br>⚠️ ค่าคาดหวังน้อยกว่า 5 จำนวน ' + c.small + ' จาก ' + c.cells + ' ช่อง — ควรแปลผลอย่างระมัดระวัง' : '')
+        : 'ข้อมูลยังไม่พอสำหรับการทดสอบ χ² (ต้องมีทั้งคนที่ส่งแล้วและยังไม่ส่ง อย่างน้อย 2 ห้อง)';
+      $('statNote').textContent = 'ช่วงความเชื่อมั่นของสัดส่วนใช้ Wilson score interval ซึ่งแม่นยำกว่าวิธี Wald เมื่อสัดส่วนเข้าใกล้ 0% หรือ 100% · เกณฑ์ Cramér\'s V ตาม Cohen (1988)';
+    }
+  }
+
+
+  // =================== ถ้วยรางวัลประจำกิจกรรม ===================
+  // ธีม "เกม" ตามประเภทกิจกรรม: ชื่อภารกิจ + ชื่อถ้วย + ลวดลายบนถ้วย
+  const THEME = {
+    'ธงชาติ': { quest: '🌅 ภารกิจยามเช้า', title: 'ผู้พิทักษ์ธงไตรรงค์', emblem: 'flag' },
+    'บังคับ (มหาวิทยาลัย)': { quest: '🙏 พิธีสำคัญ', title: 'ศิษย์ยอดกตัญญู', emblem: 'lotus' },
+    'เสริมความเป็นครู': { quest: '📚 ภารกิจปัญญา', title: 'ครูในดวงใจ', emblem: 'book' },
+    'จิตอาสา': { quest: '🤝 เควสต์อาสา', title: 'หัวใจอาสา', emblem: 'heart' },
+    'ชมรม': { quest: '🛡️ ภารกิจกิลด์', title: 'พลังทีมเวิร์ก', emblem: 'star' },
+    'อื่นๆ': { quest: '⚔️ ด่านพิเศษ', title: 'นักสู้ตัวจริง', emblem: 'torch' }
+  };
+  const theme = t => THEME[t] || THEME['อื่นๆ'];
+  const TIER = {
+    plat: { name: '💎 แพลทินัม', a: '#f4f9ff', b: '#9fb6d6', c: '#5f7aa1' },
+    gold: { name: '🥇 ทอง', a: '#fff1a8', b: '#e8b923', c: '#a87a0b' },
+    silver: { name: '🥈 เงิน', a: '#ffffff', b: '#c3cbd6', c: '#7d8a99' },
+    bronze: { name: '🥉 ทองแดง', a: '#ffd9b8', b: '#cd8a52', c: '#8a4f22' }
+  };
+  const tierOf = r => r >= 100 ? 'plat' : r >= 90 ? 'gold' : r >= 80 ? 'silver' : 'bronze';
+  let svgSeq = 0;
+  /** วาดถ้วย SVG: หูจับ ตัวถ้วย ก้าน ฐาน + ลวดลายตามประเภทกิจกรรม (ล็อก = เงาสีเทา + กุญแจ) */
+  function trophySvg(emblem, tierKey, locked) {
+    const id = 'tg' + (++svgSeq), T = TIER[tierKey] || TIER.gold;
+    const fill = locked ? '#4a505c' : 'url(#' + id + ')', edge = locked ? '#3a3f49' : T.c, deco = locked ? '#5d6472' : '#ffffff';
+    const E = {
+      flag: '<rect x="44" y="34" width="32" height="22" rx="2" fill="#fff"/><rect x="44" y="34" width="32" height="4" fill="#d6262b"/><rect x="44" y="52" width="32" height="4" fill="#d6262b"/><rect x="44" y="41" width="32" height="8" fill="#20307d"/>',
+      lotus: '<path d="M60 58c-9-3-14-10-14-18 6 1 11 5 14 11 3-6 8-10 14-11 0 8-5 15-14 18z" fill="#f7b6d2"/><path d="M60 58c-4-6-4-15 0-22 4 7 4 16 0 22z" fill="#ee7fb0"/><path d="M47 60h26" stroke="#7bc47f" stroke-width="3" stroke-linecap="round"/>',
+      book: '<path d="M44 42c6-3 11-3 16 0v18c-5-3-10-3-16 0z" fill="#fff"/><path d="M76 42c-6-3-11-3-16 0v18c5-3 10-3 16 0z" fill="#e8f3ff"/><path d="M60 24l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4-3.9-3.8 5.4-.8z" fill="#fff6c2"/>',
+      heart: '<path d="M60 56l-12-11a7 7 0 0 1 12-7 7 7 0 0 1 12 7z" fill="#ff5a6e"/><path d="M42 52c4 7 10 10 18 10s14-3 18-10" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>',
+      star: '<path d="M60 28l6 12.5 13.7 2-9.9 9.6 2.3 13.6L60 59.3l-12.1 6.4 2.3-13.6-9.9-9.6 13.7-2z" fill="#fff6c2" stroke="#fff" stroke-width="1.5"/>',
+      torch: '<path d="M56 46h8l-2 16h-4z" fill="#fff"/><path d="M60 26c6 6 7 11 3 17-1-3-3-4-3-4s-2 1-3 4c-4-6-3-11 3-17z" fill="#ff8a3d"/><path d="M60 33c3 3 3 6 1 9-1-1-1-2-1-2s0 1-1 2c-2-3-2-6 1-9z" fill="#ffd56b"/>'
+    }[emblem];
+    return '<svg class="art" viewBox="0 0 120 150" aria-hidden="true"><defs><linearGradient id="' + id + '" x1="0" x2="1">' +
+      '<stop offset="0" stop-color="' + T.c + '"/><stop offset=".45" stop-color="' + T.a + '"/><stop offset=".7" stop-color="' + T.b + '"/><stop offset="1" stop-color="' + T.c + '"/></linearGradient></defs>' +
+      '<path d="M30 30c-16 0-18 26 4 32M90 30c16 0 18 26-4 32" stroke="' + fill + '" stroke-width="7" fill="none" stroke-linecap="round"/>' +
+      '<path d="M28 20h64v14c0 24-14 40-32 40S28 58 28 34z" fill="' + fill + '" stroke="' + edge + '" stroke-width="2"/>' +
+      '<path d="M28 20h64" stroke="' + deco + '" stroke-opacity=".6" stroke-width="3"/>' +
+      (locked ? '<text x="60" y="56" text-anchor="middle" font-size="26" font-weight="800" fill="#6b7280">?</text>' : E) +
+      '<path d="M54 74h12l3 18H51z" fill="' + fill + '" stroke="' + edge + '" stroke-width="2"/>' +
+      '<rect x="38" y="92" width="44" height="10" rx="3" fill="' + fill + '" stroke="' + edge + '" stroke-width="2"/>' +
+      '<rect x="30" y="102" width="60" height="22" rx="4" fill="' + (locked ? '#2f343d' : '#2a1d0a') + '" stroke="' + edge + '" stroke-width="2"/>' +
+      '<rect x="40" y="108" width="40" height="10" rx="2" fill="' + (locked ? '#3c424d' : T.b) + '" opacity=".9"/>' +
+      (locked ? '<g transform="translate(80 2)"><rect x="4" y="14" width="26" height="20" rx="4" fill="#9aa3b2"/><path d="M9 14v-5a8 8 0 0 1 16 0v5" stroke="#9aa3b2" stroke-width="4" fill="none"/></g>' : '') +
+      '</svg>';
+  }
+
+  function trophyWinners(i) {   // ห้องที่ร้อยละสูงสุดในกิจกรรมที่ i (ต้องมากกว่า 0)
+    const rates = DATA.rooms.filter(r => (!YEAR || r.year === YEAR) && r.acts[i] != null).map(r => ({ r, v: r.acts[i] }));
+    const best = Math.max(0, ...rates.map(x => x.v));
+    return best > 0 ? { best, rooms: rates.filter(x => x.v === best).map(x => x.r.room) } : null;
+  }
+
+  function renderTrophies() {
+    const cards = [], unlockedNow = [];
+    DATA.activities.forEach((a, i) => {
+      const th = theme(a.type), w = trophyWinners(i);
+      if (!w) return;
+      const tk = tierOf(w.best);
+      cards.push('<div class="tro" data-tip="' + esc(a.name + ' · ' + thDate(a.date) + ' · ห้องผู้ชนะ ปี ' + w.rooms.join(', ') + ' (' + f1(w.best) + '%)') + '">' +
+        '<span class="xp">+' + Math.round(w.best) + ' XP</span><div class="quest">' + esc(th.quest) + '</div>' + trophySvg(th.emblem, tk, false) +
+        '<h3>' + esc(th.title) + '</h3><div class="act">' + esc(a.name) + '<br>' + esc(thDate(a.date)) + '</div>' +
+        '<div class="win">👑 ปี ' + esc(w.rooms.join(' · ปี ')) + '</div><span class="tier">' + TIER[tk].name + ' · ' + f1(w.best) + '%</span></div>');
+      unlockedNow.push({ key: a.code + ':' + YEAR, text: th.title + ' — ปี ' + w.rooms.join(', ') + ' (' + a.name + ')', emblem: th.emblem, tier: tk });
+    });
+    (DATA.upcoming || []).forEach(a => {
+      const th = theme(a.type);
+      cards.push('<div class="tro locked"><div class="quest">🔒 ' + esc(th.quest) + '</div>' + trophySvg(th.emblem, 'gold', true) +
+        '<h3>' + esc(th.title) + '</h3><div class="act">' + esc(a.name) + '<br>' + esc(a.date ? thDate(a.date) : (a.window || 'ยังไม่กำหนดวัน')) + '</div>' +
+        '<div class="lockmsg">' + (a.status === 'เปิดเช็คชื่อ' ? '⏳ กำลังเช็คชื่อ — ลุ้นผลเมื่อปิด' : 'ปลดล็อกเมื่อจบกิจกรรม') + '</div></div>');
+    });
+    $('trophies').innerHTML = cards.join('') || '<p class="muted">ยังไม่มีกิจกรรมในภาคเรียนนี้</p>';
+    celebrate(unlockedNow);
+  }
+
+  // ป๊อปอัปปลดล็อก — แสดงเฉพาะถ้วยที่ผู้ชมยังไม่เคยเห็นบนเครื่องนี้ (สูงสุดครั้งละ 5 ถ้วย)
+  let celebrating = false;
+  function celebrate(list) {
+    let seen = {};
+    try { seen = JSON.parse(localStorage.getItem('pe_seen_trophies') || '{}'); } catch (e) { /* โหมดส่วนตัว */ }
+    const fresh = list.filter(x => !seen[x.key]);
+    if (!fresh.length || celebrating) return;
+    fresh.forEach(x => { seen[x.key] = 1; });
+    try { localStorage.setItem('pe_seen_trophies', JSON.stringify(seen)); } catch (e) { /* ไม่เป็นไร */ }
+    celebrating = true;
+    const queue = fresh.slice(0, 5);
+    (function next() {
+      const x = queue.shift(); if (!x) { celebrating = false; return; }
+      $('unlockArt').innerHTML = trophySvg(x.emblem, x.tier, false).replace('class="art"', '');
+      $('unlockText').textContent = x.text;
+      $('unlock').classList.add('show');
+      setTimeout(() => { $('unlock').classList.remove('show'); setTimeout(next, 600); }, 3200);
+    })();
+  }
+
+  // =================== แบดจ์ความสำเร็จของห้อง ===================
+  function renderBadges() {
+    const rooms = DATA.rooms.filter(r => !YEAR || r.year === YEAR);
+    const acts = DATA.activities;
+    const flagIdx = acts.map((a, i) => a.type === 'ธงชาติ' ? i : -1).filter(i => i >= 0);
+    const meanOf = (r, idx) => { const v = idx.map(i => r.acts[i]).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+    const bestRooms = list => { const b = Math.max(0, ...list.map(x => x.m)); return b > 0 ? list.filter(x => x.m === b).map(x => x.r.room) : []; };
+    const flagBest = bestRooms(rooms.map(r => ({ r, m: meanOf(r, flagIdx) })).filter(x => x.m != null));
+    const champ = bestRooms(rooms.filter(r => r.pcts.length).map(r => ({ r, m: describe(r.pcts).mean })));
+    const B = [
+      { ic: '👑', name: 'แชมป์ประจำภาค', how: 'ค่าเฉลี่ยร้อยละการเข้าร่วมกิจกรรมสูงสุด', rooms: champ },
+      { ic: '💯', name: 'เต็มร้อย', how: 'มาครบทุกคน 100% อย่างน้อย 1 กิจกรรม', rooms: rooms.filter(r => r.acts.some(v => v === 100)).map(r => r.room) },
+      { ic: '🔥', name: 'ไฟไม่มอด', how: 'ร้อยละการเข้าร่วม ≥ 80% ทุกกิจกรรม (อย่างน้อย 3 กิจกรรม)', rooms: rooms.filter(r => { const v = r.acts.filter(x => x != null); return v.length >= 3 && v.every(x => x >= 80); }).map(r => r.room) },
+      { ic: '🇹🇭', name: 'ผู้พิทักษ์ธงไตรรงค์', how: 'ค่าเฉลี่ยการเข้าแถวเคารพธงชาติสูงสุด', rooms: flagBest },
+      { ic: '🎯', name: 'ผ่านเกณฑ์ยกห้อง', how: 'นักศึกษาทุกคนในห้องผ่านเกณฑ์ 80%', rooms: rooms.filter(r => r.pcts.length && r.pcts.length === r.n && r.pcts.every(v => v >= DATA.passPercent)).map(r => r.room) },
+      { ic: '📸', name: 'ห้องพร้อมลุย', how: 'ส่งรูปถ่ายครบทุกคนในห้อง', rooms: rooms.filter(r => r.n && r.sent === r.n).map(r => r.room) },
+      { ic: '⚡', name: 'สายฟ้าแลบ', how: 'ส่งรูปถ่ายได้ ≥ 90% ของห้อง', rooms: rooms.filter(r => r.n && r.sent / r.n >= .9).map(r => r.room) }
+    ];
+    $('badges').innerHTML = B.map(b => '<div class="badge' + (b.rooms.length ? '' : ' locked') + '"><span class="ic">' + (b.rooms.length ? b.ic : '🔒') + '</span><span><b>' + esc(b.name) + '</b><small>' + esc(b.how) + '</small>' +
+      '<span class="rooms">' + (b.rooms.length ? '🏅 ปี ' + esc(b.rooms.join(' · ปี ')) : 'ยังไม่มีห้องปลดล็อก') + '</span></span></div>').join('');
+  }
+
+  // tooltip
+  const tip = $('tip');
+  document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (!t) { tip.classList.add('hidden'); return; } tip.textContent = t.getAttribute('data-tip'); tip.classList.remove('hidden'); });
+  document.addEventListener('pointermove', e => { if (tip.classList.contains('hidden')) return; tip.style.left = Math.max(8, Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8)) + 'px'; tip.style.top = (e.clientY + 16) + 'px'; });
+  document.addEventListener('scroll', () => tip.classList.add('hidden'), { passive: true });
+
+  load();
+</script>
+</body>
+</html>
