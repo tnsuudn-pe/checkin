@@ -654,14 +654,14 @@
       const tk = tierOf(w.best);
       cards.push('<div class="tro" data-tip="' + esc(a.name + ' · ' + thDate(a.date) + ' · ห้องผู้ชนะ ปี ' + w.rooms.join(', ') + ' (' + f1(w.best) + '%)') + '">' +
         '<span class="xp">+' + Math.round(w.best) + ' XP</span><div class="quest">' + esc(th.quest) + '</div>' + trophySvg(th.emblem, tk, false) +
-        '<h3>' + esc(th.title) + '</h3><div class="act">' + esc(a.name) + '<br>' + esc(thDate(a.date)) + '</div>' +
+        '<h3>' + esc(a.trophy || th.title) + '</h3><div class="act">' + esc(a.name) + '<br>' + esc(thDate(a.date)) + '</div>' +
         '<div class="win">👑 ปี ' + esc(w.rooms.join(' · ปี ')) + '</div><span class="tier">' + TIER[tk].name + ' · ' + f1(w.best) + '%</span></div>');
-      unlockedNow.push({ key: a.code + ':' + YEAR, text: th.title + ' — ปี ' + w.rooms.join(', ') + ' (' + a.name + ')', emblem: th.emblem, tier: tk });
+      unlockedNow.push({ key: a.code + ':' + YEAR, text: (a.trophy || th.title) + ' — ปี ' + w.rooms.join(', ') + ' (' + a.name + ')', emblem: th.emblem, tier: tk });
     });
     (DATA.upcoming || []).forEach(a => {
       const th = theme(a.type);
       cards.push('<div class="tro locked"><div class="quest">🔒 ' + esc(th.quest) + '</div>' + trophySvg(th.emblem, 'gold', true) +
-        '<h3>' + esc(th.title) + '</h3><div class="act">' + esc(a.name) + '<br>' + esc(a.date ? thDate(a.date) : (a.window || 'ยังไม่กำหนดวัน')) + '</div>' +
+        '<h3>' + esc(a.trophy || th.title) + '</h3><div class="act">' + esc(a.name) + '<br>' + esc(a.date ? thDate(a.date) : (a.window || 'ยังไม่กำหนดวัน')) + '</div>' +
         '<div class="lockmsg">' + (a.status === 'เปิดเช็คชื่อ' ? '⏳ กำลังเช็คชื่อ — ลุ้นผลเมื่อปิด' : 'ปลดล็อกเมื่อจบกิจกรรม') + '</div></div>');
     });
     $('trophies').innerHTML = cards.join('') || '<p class="muted">ยังไม่มีกิจกรรมในภาคเรียนนี้</p>';
