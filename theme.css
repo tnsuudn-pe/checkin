@@ -1,51 +1,93 @@
-/* ธีมร่วมทุกหน้า — แถบเมนูขาว + ตรามหาวิทยาลัย, แถบหัวเรื่องสีกรมท่า, การ์ดมุมโค้ง
+/* ธีมร่วมทุกหน้า "Stadium Night" — แถบเมนูกระจกขาว + ตรามหาวิทยาลัย, หัวเรื่องแบบสนามกีฬายามค่ำ (ไฟสนาม + ลู่วิ่ง),
+   ตัวเลขแบบสกอร์บอร์ด (Kanit), การ์ดมุมโค้งเงาสองชั้น
    โหลดหลัง <style> ของแต่ละหน้า จึงทับสไตล์หัวหน้าเดิม */
-@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=Sarabun:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kanit:ital,wght@0,500;0,600;0,700;1,700&family=Prompt:wght@500;600;700&family=Sarabun:wght@400;600;700&display=swap');
 
 :root {
   --brand-navy: #0a2a66;
   --brand-navy-2: #12397f;
+  --brand-ink: #061a42;
   --brand-gold: #d9a520;
+  --brand-gold-2: #f3cf5a;
   --brand-gold-soft: #f6e7b8;
   --page-bg: #f3f5f9;
+  --shadow-1: 0 1px 2px rgba(10, 42, 102, .06), 0 6px 20px rgba(10, 42, 102, .07);
+  --shadow-2: 0 2px 4px rgba(10, 42, 102, .08), 0 14px 34px rgba(10, 42, 102, .14);
 }
 
-body { font-family: 'Sarabun', system-ui, sans-serif; }
-body:not([data-dark]) { background: var(--page-bg); }   /* หน้าที่รองรับโหมดมืด (data-dark) กำหนดพื้นหลังเอง */
+body { font-family: 'Sarabun', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+body:not([data-dark]) {
+  background: radial-gradient(1200px 500px at 50% -200px, #e4eaf6 0%, transparent 70%), var(--page-bg);
+  background-attachment: fixed;
+}
+h1, h2, h3 { font-family: 'Kanit', 'Prompt', sans-serif; font-weight: 600; letter-spacing: .1px; }
+/* ตัวเลขทุกตารางเรียงตรงหลักเหมือนสกอร์บอร์ด */
+table, .kpi, .num, td { font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 3px solid var(--brand-gold); outline-offset: 2px; border-radius: 6px; }
+::selection { background: var(--brand-gold-soft); color: var(--brand-ink); }
 
-/* ---------- แถบเมนูด้านบน (ขาว) */
+/* ---------- แถบเมนูด้านบน (กระจกขาว) */
 header.site {
   position: sticky; top: 0; z-index: 30;
-  background: #fff; color: var(--brand-navy);
-  padding: 0; border: 0; box-shadow: 0 1px 0 #e3e7ef, 0 4px 14px rgba(10, 42, 102, .06);
+  background: rgba(255, 255, 255, .86); color: var(--brand-navy);
+  -webkit-backdrop-filter: saturate(1.6) blur(12px); backdrop-filter: saturate(1.6) blur(12px);
+  padding: 0; border: 0; box-shadow: 0 1px 0 rgba(10, 42, 102, .1), 0 8px 24px rgba(10, 42, 102, .06);
 }
 header.site .wrap { max-width: 1100px; margin: 0 auto; padding: 8px 16px; display: flex; align-items: center; gap: 16px; }
 header.site .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; min-width: 0; }
-header.site .brand img { width: 46px; height: 48px; object-fit: contain; flex: none; }
-header.site .brand b { display: block; font-family: 'Prompt', sans-serif; font-weight: 600; font-size: 17px; line-height: 1.2; }
+header.site .brand img { width: 46px; height: 48px; object-fit: contain; flex: none; filter: drop-shadow(0 2px 4px rgba(10, 42, 102, .18)); }
+header.site .brand b { display: block; font-family: 'Kanit', 'Prompt', sans-serif; font-weight: 600; font-size: 17px; line-height: 1.2; }
 header.site .brand small { display: block; font-size: 12px; color: #4b5873; line-height: 1.3; }
-header.site nav { margin-left: auto; display: flex; gap: 4px; }
+header.site nav { margin-left: auto; display: flex; gap: 2px; }
 header.site nav a {
-  font-family: 'Prompt', sans-serif; font-weight: 500; font-size: 15px; color: var(--brand-navy);
-  text-decoration: none; padding: 8px 12px; border-radius: 8px; white-space: nowrap;
+  position: relative; font-family: 'Prompt', sans-serif; font-weight: 500; font-size: 15px; color: var(--brand-navy);
+  text-decoration: none; padding: 8px 12px; border-radius: 10px; white-space: nowrap; transition: background .2s, color .2s;
 }
 header.site nav a:hover { background: #eef2f9; }
-header.site nav a[aria-current="page"] { background: var(--brand-gold); color: #1d1a10; }
+header.site nav a[aria-current="page"] { background: var(--brand-navy); color: #fff; }
+header.site nav a[aria-current="page"]::after {
+  content: ''; position: absolute; left: 12px; right: 12px; bottom: 3px; height: 3px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--brand-gold), var(--brand-gold-2));
+}
 
-/* ---------- แถบหัวเรื่องสีกรมท่า */
-.band { background: linear-gradient(120deg, var(--brand-navy) 0%, var(--brand-navy-2) 100%); color: #fff; }
-.band .wrap { max-width: 1100px; margin: 0 auto; padding: 18px 16px 20px; display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+/* ---------- หัวเรื่องแบบสนามกีฬายามค่ำ: ไฟสนามสองดวง + เส้นลู่วิ่ง + แถบทองเฉียง */
+.band {
+  position: relative; overflow: hidden; color: #fff; isolation: isolate;
+  background:
+    radial-gradient(420px 220px at 12% -40px, rgba(255, 255, 255, .22), transparent 70%),
+    radial-gradient(420px 220px at 88% -40px, rgba(255, 255, 255, .18), transparent 70%),
+    linear-gradient(160deg, var(--brand-navy-2) 0%, var(--brand-navy) 45%, var(--brand-ink) 100%);
+}
+.band::before {   /* เส้นลู่วิ่งโค้งด้านขวา */
+  content: ''; position: absolute; z-index: -1; right: -180px; bottom: -260px; width: 620px; height: 420px; border-radius: 50%;
+  background: repeating-radial-gradient(ellipse at center, transparent 0 34px, rgba(255, 255, 255, .09) 34px 36px);
+  pointer-events: none;
+}
+.band .wrap { position: relative; max-width: 1100px; margin: 0 auto; padding: 22px 16px 24px; display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .band .titles { flex: 1; min-width: 0; }
 .band .crumb { font-size: 13px; opacity: .85; margin-bottom: 4px; }
 .band .crumb a { color: #fff; }
-.band h1 { margin: 0; font-family: 'Prompt', sans-serif; font-weight: 600; font-size: 24px; line-height: 1.3; color: #fff; }
-.band p, .band small { margin: 4px 0 0; font-size: 14px; opacity: .88; display: block; }
-.band button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.7); border-radius: 8px; padding: 8px 14px; font: inherit; font-weight: 600; width: auto; margin: 0; }
-.band::after { content: ''; display: block; height: 4px; background: var(--brand-gold); }
+.band h1 {
+  margin: 0; font-family: 'Kanit', 'Prompt', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.25; color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, .25);
+}
+.band h1::before {   /* แถบทองเฉียงหน้าหัวเรื่อง */
+  content: ''; display: inline-block; width: 10px; height: .9em; margin-right: 10px; vertical-align: -2px;
+  background: linear-gradient(180deg, var(--brand-gold-2), var(--brand-gold)); transform: skewX(-16deg); border-radius: 2px;
+}
+.band p, .band small { margin: 6px 0 0; font-size: 14px; opacity: .9; display: block; }
+.band button {
+  background: rgba(255, 255, 255, .08); color: #fff; border: 1px solid rgba(255, 255, 255, .55); border-radius: 10px;
+  padding: 8px 14px; font: inherit; font-weight: 600; width: auto; margin: 0; cursor: pointer; transition: background .2s;
+}
+.band button:hover { background: rgba(255, 255, 255, .18); }
+.band::after { content: ''; display: block; height: 4px; background: linear-gradient(90deg, var(--brand-gold) 0%, var(--brand-gold-2) 50%, var(--brand-gold) 100%); }
 
 /* ---------- การ์ดและปุ่ม */
-.card { border-radius: 16px; box-shadow: 0 2px 10px rgba(10, 42, 102, .05); }
-h2 { font-family: 'Prompt', sans-serif; font-weight: 600; }
+.card { border-radius: 18px; box-shadow: var(--shadow-1); transition: box-shadow .25s, transform .25s; }
+@media (hover: hover) { a.card:hover, .card.lift:hover { box-shadow: var(--shadow-2); transform: translateY(-2px); } }
+.tab, .chip { transition: background .2s, color .2s, border-color .2s, box-shadow .2s; }
+.tab[aria-selected="true"] { box-shadow: 0 4px 14px rgba(10, 42, 102, .25); }
 
 @media (max-width: 720px) {
   header.site .wrap { flex-wrap: wrap; gap: 6px 12px; padding: 8px 12px 6px; }
@@ -54,15 +96,21 @@ h2 { font-family: 'Prompt', sans-serif; font-weight: 600; }
   header.site nav { margin-left: 0; width: 100%; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
   header.site nav::-webkit-scrollbar { display: none; }
   header.site nav a { font-size: 14px; padding: 6px 10px; }
-  .band .wrap { padding: 14px 12px 16px; }
-  .band h1 { font-size: 20px; }
+  .band .wrap { padding: 16px 12px 18px; }
+  .band h1 { font-size: 22px; }
+  .band::before { right: -300px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .tab, .chip, header.site nav a { transition: none; }
 }
 
 /* โหมดมืด — เฉพาะหน้าที่ประกาศ data-dark (Dashboard) */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) body[data-dark] header.site { background: #1a1d22; color: #eef1f7; box-shadow: 0 1px 0 #2b3038; }
+  :root:not([data-theme="light"]) body[data-dark] header.site { background: rgba(26, 29, 34, .88); color: #eef1f7; box-shadow: 0 1px 0 #2b3038; }
   :root:not([data-theme="light"]) body[data-dark] header.site .brand small { color: #a9b2c3; }
   :root:not([data-theme="light"]) body[data-dark] header.site nav a { color: #dfe6f3; }
   :root:not([data-theme="light"]) body[data-dark] header.site nav a:hover { background: #262b33; }
+  :root:not([data-theme="light"]) body[data-dark] header.site nav a[aria-current="page"] { background: #2b3a5c; color: #fff; }
   :root:not([data-theme="light"]) body[data-dark] .card { box-shadow: none; }
 }
