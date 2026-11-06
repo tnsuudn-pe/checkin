@@ -48,6 +48,40 @@
   .acts { display:flex; gap:8px; margin-top:10px; }
   .hint { color:var(--muted); font-size:13px; }
   .hidden { display:none !important; }
+
+  /* ---------- ธีมเดียวกับบัตรนักกีฬา (หน้า QR ของฉัน): พื้นสนามยามค่ำ แผงกรมท่า ขอบทอง ตัวเลขสกอร์บอร์ด */
+  body { background:radial-gradient(120% 60% at 50% 0%, #12306b 0%, #0a1d47 45%, #050f27 100%) fixed !important; min-height:100vh; }   /* ทับพื้นสว่างของ theme.css */
+  .panel { position:relative; overflow:hidden; isolation:isolate; color:#fff; border:1px solid #1d3b78; border-radius:18px; padding:16px;
+    background:radial-gradient(130% 80% at 100% 0%, #1d4596 0%, #0d275e 50%, #071636 100%); box-shadow:0 12px 30px rgba(0,0,0,.35); }
+  .panel::after { content:''; position:absolute; left:0; right:0; bottom:0; height:3px; background:linear-gradient(90deg, #1fa055 0 33%, #fff 33% 66%, #f5c518 66%); }
+  .panel label { color:#dfe7f6; }
+  .panel input, .panel select { background:rgba(255,255,255,.96); border-color:transparent; border-radius:10px; }
+  .panel .hint { color:#b9c7e6; }
+  .msg { color:#ffb4ab; }
+  .btn { border-radius:10px; background:#f3cf5a; color:#1d1a10; }
+  .btn.next { background:linear-gradient(180deg, #2fbf6f, #1a7f4b); color:#fff; box-shadow:0 8px 20px rgba(26,127,75,.35); }
+  .btn.g { background:linear-gradient(180deg, #8f74ff, #6a4be6); color:#fff; }
+  .cam { border-radius:18px; height:56vh; border:1px solid #1d3b78; box-shadow:0 14px 34px rgba(0,0,0,.45); }
+  /* กรอบเล็งแบบมุมทอง + เส้นสแกนวิ่ง */
+  .frame { border:0; border-radius:0;
+    background:
+      linear-gradient(#f3cf5a, #f3cf5a) top left / 34px 4px, linear-gradient(#f3cf5a, #f3cf5a) top left / 4px 34px,
+      linear-gradient(#f3cf5a, #f3cf5a) top right / 34px 4px, linear-gradient(#f3cf5a, #f3cf5a) top right / 4px 34px,
+      linear-gradient(#f3cf5a, #f3cf5a) bottom left / 34px 4px, linear-gradient(#f3cf5a, #f3cf5a) bottom left / 4px 34px,
+      linear-gradient(#f3cf5a, #f3cf5a) bottom right / 34px 4px, linear-gradient(#f3cf5a, #f3cf5a) bottom right / 4px 34px;
+    background-repeat:no-repeat; box-shadow:0 0 0 100vmax rgba(5,15,39,.35); }
+  .frame::after { content:''; position:absolute; left:6%; right:6%; height:2px; top:8%; border-radius:2px;
+    background:linear-gradient(90deg, transparent, #f3cf5a, transparent); box-shadow:0 0 12px #f3cf5a; animation:sweep 2.2s ease-in-out infinite alternate; }
+  @keyframes sweep { to { top:92%; } }
+  .count { top:10px; left:10px; padding:4px 12px; background:rgba(5,15,39,.75); border:1px solid rgba(243,207,90,.5); font-family:'Barlow Condensed',sans-serif; font-size:16px; letter-spacing:.4px; }
+  .result { border-radius:18px; }
+  .result h2 { font-family:'IBM Plex Sans Thai','Prompt',sans-serif; }
+  .stu .name { font-family:'IBM Plex Sans Thai','Prompt',sans-serif; }
+  .pop b { width:132px; height:132px; border-radius:50%; display:grid; place-items:center; background:rgba(255,255,255,.16); border:3px solid rgba(255,255,255,.85); }
+  .pop b svg { width:76px; height:76px; }
+  .pop span { font-family:'IBM Plex Sans Thai','Prompt',sans-serif; }
+  #camMsg { color:#dfe7f6 !important; }
+  @media (prefers-reduced-motion: reduce) { .frame::after { animation:none; top:50%; } }
 </style>
 <link rel="stylesheet" href="theme.css">
 <link rel="icon" href="logo-mark.png">
@@ -119,7 +153,8 @@
   }
   /** ภาพเด้งกลางจอ + เสียง ยืนยันผลทันที (สำเร็จ / ซ้ำ / ไม่สำเร็จ) */
   function pop(kind, title, sub) {
-    const icon = { ok: '✅', dup: '⚠️', bad: '❌' }[kind];
+    const P = { ok: '<path d="M5 12.5l4.5 4.5L19 7.5"/>', dup: '<path d="M12 7v6M12 17h.01"/>', bad: '<path d="M7 7l10 10M17 7L7 17"/>' }[kind];
+    const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + P + '</svg>';
     const el = document.createElement('div'); el.className = 'pop ' + kind;
     el.innerHTML = '<b>' + icon + '</b><span>' + esc(title) + '</span>' + (sub ? '<small>' + esc(sub) + '</small>' : '');
     document.body.appendChild(el);
