@@ -72,13 +72,43 @@
   }
 
   /* ---------- อันดับทั้งหมด (แถบ + ช่วงความเชื่อมั่น 95%) */
-  .rank { display:grid; gap:4px; }
-  .rrow { display:grid; grid-template-columns:44px 74px 1fr 120px; gap:10px; align-items:center; padding:5px 6px; border-radius:10px; }
-  .rrow.top { background:#fff8e1; }
-  .rrow .no { font-family:'Prompt',sans-serif; font-weight:700; font-size:18px; text-align:center; color:var(--navy); }
-  .rrow .rm { font-weight:700; white-space:nowrap; }
+  /* แถวแบบตารางผล F1: อันดับตัวเอียง · แถบสีชั้นปี · รหัสห้อง · แถบคะแนน · คะแนน + ห่างจากที่ 1 · ขยับอันดับ */
+  .rank { display:grid; gap:6px; perspective:900px; }
+  .rhead { display:grid; grid-template-columns:52px 92px 1fr 104px 46px; gap:10px; padding:0 10px 2px; font-size:11px; font-weight:700; letter-spacing:.6px; color:var(--muted); text-transform:uppercase; }
+  .rhead span:nth-child(4), .rhead span:nth-child(5) { text-align:right; }
+  .rrow { --yc:var(--s1); position:relative; display:grid; grid-template-columns:52px 92px 1fr 104px 46px; gap:10px; align-items:center;
+    padding:8px 10px 8px 0; border-radius:12px; background:linear-gradient(90deg, #f7f9fc, #fff 40%); border:1px solid var(--line); overflow:hidden;
+    transform-style:preserve-3d; transition:transform .25s, box-shadow .25s; animation:rin .55s cubic-bezier(.2,.9,.3,1.1) both; animation-delay:calc(var(--i) * 45ms); }
+  .rank:not(.in) .rrow, .rank:not(.in) .mv { animation-play-state:paused; }   /* เริ่มเล่นเมื่อเลื่อนมาถึงตาราง */
+  @keyframes rin { from { opacity:0; transform:translateX(-28px) rotateY(-8deg); } }
+  .rrow[data-y="2"] { --yc:var(--s2); } .rrow[data-y="3"] { --yc:var(--s3); } .rrow[data-y="4"] { --yc:var(--s4); }
+  .rrow::before { content:''; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--yc); }
+  .rrow.top { background:linear-gradient(90deg, #fff4cc, #fffaf0 45%, #fff); border-color:#f0d98a; }
+  .rrow.lead { box-shadow:0 0 0 2px var(--gold), 0 10px 28px rgba(217,165,32,.28); }
+  .rrow.lead::after { content:''; position:absolute; inset:0; background:linear-gradient(110deg, transparent 30%, rgba(255,255,255,.7) 50%, transparent 70%); transform:translateX(-100%); animation:shine 3.2s ease-in-out 1.2s infinite; pointer-events:none; }
+  @keyframes shine { 60%, 100% { transform:translateX(100%); } }
+  @media (hover:hover) { .rrow:hover { transform:translateZ(18px) rotateX(3deg); box-shadow:0 12px 26px rgba(10,42,102,.16); z-index:2; } }
+  .rrow .track .fill { background:linear-gradient(90deg, color-mix(in srgb, var(--yc) 70%, #fff), var(--yc)); }
+  .rrow .no { font-family:'Kanit',sans-serif; font-style:italic; font-weight:700; font-size:24px; text-align:center; color:var(--navy); line-height:1; }
+  .rrow .rm { display:flex; flex-direction:column; line-height:1.15; white-space:nowrap; }
+  .rrow .rm b { font-family:'Kanit',sans-serif; font-weight:700; font-size:17px; letter-spacing:.3px; }
+  .rrow .rm small { font-size:11px; font-weight:700; color:var(--yc); letter-spacing:.5px; }
   .rrow .val { text-align:right; font-variant-numeric:tabular-nums; font-size:14px; }
+  .rrow .val b { font-family:'Kanit',sans-serif; font-size:19px; font-weight:600; }
   .rrow .val small { display:block; color:var(--muted); font-size:11px; }
+  .rrow .mv { text-align:center; font-size:12px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .mv.up { color:#118a55; } .mv.dn { color:#d8433a; } .mv.eq { color:var(--muted); }
+  .mv.up, .mv.dn { animation:bump .7s cubic-bezier(.2,1.6,.4,1) both; animation-delay:calc(var(--i) * 45ms + .5s); }
+  @keyframes bump { from { opacity:0; transform:translateY(8px) scale(.5); } }
+  @media (max-width:600px) {
+    .rhead { display:none; }
+    .rrow { grid-template-columns:40px 70px 1fr 40px; gap:8px; }
+    .rrow .track { grid-column:2 / 4; grid-row:2; height:10px; }
+    .rrow .val { grid-column:3; grid-row:1; }
+    .rrow .mv { grid-column:4; grid-row:1 / 3; }
+    .rrow .no { grid-row:1 / 3; font-size:22px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .rrow, .mv.up, .mv.dn, .rrow.lead::after { animation:none; } .rrow { transition:none; } }
   .track { position:relative; height:16px; background:var(--track); border-radius:4px; }
   .track .fill { position:absolute; left:0; top:0; bottom:0; background:var(--series); border-radius:4px; transform-origin:left; animation:grow .9s ease-out both; }
   @keyframes grow { from { transform:scaleX(0); } }
@@ -457,14 +487,36 @@
       ? 'คะแนน = ค่าเฉลี่ยร้อยละการเข้าร่วมกิจกรรมของนักศึกษาในห้อง · เส้นดำ = ช่วงความเชื่อมั่น 95% ของค่าเฉลี่ย (t-distribution) · เส้นตั้ง = เกณฑ์ผ่าน ' + DATA.passPercent + '%'
       : 'คะแนน = ร้อยละของนักศึกษาในห้องที่ส่งรูปแล้ว · เส้นดำ = ช่วงความเชื่อมั่น 95% (Wilson score interval)';
     if (!list.length) { $('rank').innerHTML = '<p class="muted">ยังไม่มีข้อมูล</p>'; $('rankNote').textContent = ''; return; }
-    const medal = { 1: '🥇', 2: '🥈', 3: '🥉' };
-    $('rank').innerHTML = list.map(x =>
-      '<div class="rrow' + (x.rank <= 3 ? ' top' : '') + '"><span class="no">' + (medal[x.rank] || x.rank) + '</span><span class="rm">ปี ' + esc(x.r.room) + '</span>' +
+    // อันดับครั้งก่อนที่เครื่องนี้เห็น (ต่อแท็บ/ชั้นปี) → ลูกศรขยับอันดับแบบ F1
+    const memKey = 'pe_rank_' + TAB + '_' + (YEAR || 'all');
+    let prev = {}; try { prev = JSON.parse(localStorage.getItem(memKey) || '{}'); } catch (e) { /* ไม่เป็นไร */ }
+    try { localStorage.setItem(memKey, JSON.stringify(Object.fromEntries(list.map(x => [x.r.room, x.rank])))); } catch (e) { /* ไม่เป็นไร */ }
+    // FLIP: จำตำแหน่งแถวเดิม เพื่อให้แถวเลื่อนไปตำแหน่งใหม่เมื่อเปลี่ยนแท็บ/ชั้นปี
+    const before = {}; $('rank').querySelectorAll('.rrow').forEach(el => { before[el.dataset.k] = el.getBoundingClientRect().top; });
+    const lead = list[0].score;
+    if (!window._rankIO && 'IntersectionObserver' in window) {
+      window._rankIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); }), { threshold: .15 });
+      window._rankIO.observe($('rank'));
+    } else if (!('IntersectionObserver' in window)) $('rank').classList.add('in');
+    $('rank').innerHTML = '<div class="rhead"><span>Pos</span><span>ห้อง</span><span>' + (att ? 'ร้อยละเข้าร่วม' : 'ร้อยละส่งรูป') + '</span><span>คะแนน / ห่าง</span><span>±</span></div>' +
+      list.map((x, i) => {
+        const p = prev[x.r.room], d = p ? p - x.rank : 0;
+        const mv = !p ? '<span class="mv eq">•</span>' : d > 0 ? '<span class="mv up">▲' + d + '</span>' : d < 0 ? '<span class="mv dn">▼' + (-d) + '</span>' : '<span class="mv eq">—</span>';
+        const gap = i ? '+' + f1(lead - x.score) : 'ผู้นำ';
+        return '<div class="rrow' + (x.rank <= 3 ? ' top' : '') + (x.rank === 1 ? ' lead' : '') + '" data-k="' + esc(x.r.room) + '" data-y="' + esc(x.r.year) + '" style="--i:' + i + '">' +
+      '<span class="no">' + x.rank + '</span><span class="rm"><b>ปี ' + esc(x.r.room) + '</b><small>PE·Y' + esc(x.r.year) + '</small></span>' +
       '<div class="track" data-tip="' + esc('ปี ' + x.r.room + ' · อันดับ ' + x.rank + ': ' + f1(x.score) + '% (95% CI ' + f1(x.lo) + '–' + f1(x.hi) + ') · ' + x.label) + '">' +
       '<span class="fill" style="width:' + Math.min(100, x.score) + '%"></span>' +
       (att ? '<span class="goal" style="left:' + DATA.passPercent + '%"></span>' : '') +
       '<span class="ci" style="left:' + x.lo + '%;width:' + Math.max(0.5, x.hi - x.lo) + '%"></span></div>' +
-      '<span class="val"><b>' + f1(x.score) + '%</b><small>' + esc(x.label) + '</small></span></div>').join('');
+      '<span class="val"><b>' + f1(x.score) + '%</b><small>' + gap + ' · ' + esc(x.label) + '</small></span>' + mv + '</div>';
+      }).join('');
+    $('rank').querySelectorAll('.rrow').forEach(el => {
+      const t = before[el.dataset.k]; if (t == null) return;
+      const dy = t - el.getBoundingClientRect().top; if (!dy) return;
+      el.style.animation = 'none';   // แถวที่มีอยู่แล้วเลื่อนตำแหน่งแทนการสไลด์เข้าใหม่
+      el.animate([{ transform: 'translateY(' + dy + 'px)' }, { transform: 'none' }], { duration: 600, easing: 'cubic-bezier(.2,.9,.3,1)' });
+    });
     const overlap = list.length > 1 && list[1].hi >= list[0].lo;
     $('rankNote').textContent = 'อันดับเท่ากันเมื่อคะแนน (ทศนิยม 1 ตำแหน่ง) เท่ากัน แบบการจัดอันดับกีฬา (1, 1, 3) · ' +
       (overlap ? 'ช่วงความเชื่อมั่นของอันดับ 1 และ 2 ซ้อนทับกัน แปลว่าคะแนนยังสูสี ยังไม่อาจสรุปได้ว่าต่างกันจริงทางสถิติ' : 'ช่วงความเชื่อมั่นของอันดับ 1 ไม่ซ้อนกับอันดับ 2 — นำห่างชัดเจน');
