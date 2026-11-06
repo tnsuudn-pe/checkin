@@ -57,7 +57,7 @@
     const all = messages(d);
     // รายการเต็มในหน้า (ถ้ามีช่อง)
     const sec = document.getElementById('newsSection');
-    if (sec) sec.innerHTML = all.length ? all.map(m => '<div class="nw-item"><small>' + m.who + '</small>' + m.html + '</div>').join('') : '<div class="nw-item">ยังไม่มีกิจกรรมหรือประกาศในสัปดาห์นี้และสัปดาห์หน้า</div>';
+    if (sec) sec.innerHTML = all.length ? all.map(m => '<div class="nw-item"><small>' + m.who + '</small>' + m.html + '</div>').join('') : '<div class="news-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>ยังไม่มีกิจกรรมหรือประกาศในสัปดาห์นี้และสัปดาห์หน้า</div>';
     if (!all.length) return;
     const seen = seenSet(), fresh = all.filter(m => !seen[m.id]);
     const bell = document.createElement('button');
