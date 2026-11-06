@@ -40,6 +40,34 @@
   @keyframes pulse { 50% { opacity:.2; } }
   .net { font-size:12px; color:var(--muted); text-align:center; margin-top:6px; }
   .hidden { display:none; }
+  /* บัตรนักกีฬา: พื้นกรมท่า ขอบทอง ห่วงสามห่วงลายน้ำ — ไม่มีรูปถ่าย (ลดข้อมูลส่วนบุคคลบนจอ) */
+  .pass { position:relative; overflow:hidden; isolation:isolate; padding:16px 16px 14px; border-radius:20px; color:#fff; border:1px solid #0a2a66;
+    background:radial-gradient(130% 80% at 100% 0%, #1d4596 0%, #0d275e 45%, #061a42 100%); box-shadow:0 14px 34px rgba(6,26,66,.28); }
+  .pass::before { content:''; position:absolute; z-index:-1; right:-40px; top:-14px; width:210px; height:90px; opacity:.13;
+    background:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 64' fill='none' stroke='%23fff' stroke-width='5'><circle cx='32' cy='32' r='26.5'/><circle cx='75' cy='32' r='26.5'/><circle cx='118' cy='32' r='26.5'/></svg>") center / contain no-repeat; }
+  .pass::after { content:''; position:absolute; left:0; right:0; bottom:0; height:4px; background:linear-gradient(90deg, #1fa055 0 33%, #fff 33% 66%, #f5c518 66%); }
+  .pass .top { display:flex; align-items:center; gap:10px; }
+  .pass .top img { width:34px; height:36px; object-fit:contain; flex:none; }
+  .pass .top span:not(.tag) { min-width:0; }
+  .pass .top b { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:13px; font-weight:600; letter-spacing:.2px; }
+  .pass .top small { display:block; font-size:11px; color:#b9c7e6; }
+  .pass .tag { margin-left:auto; font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; background:rgba(243,207,90,.16); color:#f3cf5a; border:1px solid rgba(243,207,90,.45); white-space:nowrap; }
+  .pass .who { text-align:left; margin:14px 0 0; }
+  .pass .who b { font-family:'IBM Plex Sans Thai','Prompt',sans-serif; font-size:22px; font-weight:700; line-height:1.25; }
+  .pass .meta { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+  .pass .meta span { font-size:12.5px; padding:3px 10px; border-radius:8px; background:rgba(255,255,255,.1); color:#e4ebf8; }
+  .pass .meta .id { font-family:'Barlow Condensed',sans-serif; font-size:16px; letter-spacing:1px; padding:1px 10px; }
+  .pass .ring { margin:14px auto 10px; }
+  .pass .bar { background:rgba(255,255,255,.14); }
+  .pass .bar i { background:#f3cf5a; }
+  .pass .live { color:#dfe7f6; }
+  .pass .live .clock { color:#fff; font-family:'Barlow Condensed',sans-serif; font-size:26px; letter-spacing:.5px; }
+  .pass .dot { background:#3ddc84; }
+  .pass .hint { color:#b9c7e6; }
+  .pass .hint b { color:#fff; }
+  .pass .net { color:#93a4c8; }
+  .after { margin-top:12px; }
+  #btnMe { margin-top:0; background:#fff; color:var(--brand-navy, #0a2a66); border:1px solid #c9d3e6; }
 </style>
 <link rel="stylesheet" href="theme.css">
 <link rel="icon" href="logo-mark.png">
@@ -62,15 +90,20 @@
     <div class="msg" id="msg"></div>
   </section>
 
-  <section class="card hidden" id="show">
-    <div class="who"><b id="vName"></b><span id="vInfo"></span></div>
-    <div class="ring" id="ring"><div id="qr"></div></div>
-    <div class="bar"><i id="bar" style="width:100%"></i></div>
-    <div class="live"><span><span class="dot"></span> QR เปลี่ยนใน <b id="left">10</b> วิ</span><span class="clock" id="clock"></span></div>
-    <p class="hint" style="margin:10px 0 0">ยื่นหน้าจอนี้ให้ผู้ตรวจสแกน · <b>ภาพแคปหน้าจอหรือภาพที่ส่งต่อใช้ไม่ได้</b> — QR เปลี่ยนทุก 10 วินาที ระบบรับเฉพาะ QR สด และกรอบสีต้องหมุนอยู่ตลอด</p>
-    <div class="net" id="net"></div>
-    <button id="btnMe" type="button" style="background:#fff;color:var(--navy);border:1px solid var(--navy)">ผลการเข้าร่วมกิจกรรมของฉัน</button>
-    <div id="me" class="hidden" style="margin-top:12px;font-size:14px;line-height:1.6"></div>
+  <section class="hidden" id="show">
+    <div class="pass">
+      <div class="top"><img src="logo-mark.png" alt=""><span><b>คณะพลศึกษา มกช. อุดรธานี</b><small>บัตรเช็คชื่อกิจกรรมนักศึกษา</small></span><span class="tag">STUDENT PASS</span></div>
+      <div class="who"><b id="vName"></b><div class="meta"><span class="id" id="vId"></span><span id="vInfo"></span></div></div>
+      <div class="ring" id="ring"><div id="qr"></div></div>
+      <div class="bar"><i id="bar" style="width:100%"></i></div>
+      <div class="live"><span><span class="dot"></span> QR เปลี่ยนใน <b id="left">10</b> วิ</span><span class="clock" id="clock"></span></div>
+      <p class="hint" style="margin:10px 0 4px">ยื่นหน้าจอนี้ให้ผู้ตรวจสแกน · <b>ภาพแคปหน้าจอหรือภาพที่ส่งต่อใช้ไม่ได้</b> — QR เปลี่ยนทุก 10 วินาที และกรอบสีต้องหมุนอยู่ตลอด</p>
+      <div class="net" id="net"></div>
+    </div>
+    <div class="card after">
+      <button id="btnMe" type="button">ผลการเข้าร่วมกิจกรรมของฉัน</button>
+      <div id="me" class="hidden" style="margin-top:12px;font-size:14px;line-height:1.6"></div>
+    </div>
   </section>
 
   <section class="card hint">
@@ -135,7 +168,8 @@
   function showQr() {
     $('setup').classList.add('hidden'); $('show').classList.remove('hidden');
     $('vName').textContent = REC.name;
-    $('vInfo').textContent = REC.id + ' · ปี ' + REC.year + ' ห้อง ' + REC.room;
+    $('vId').textContent = REC.id;
+    $('vInfo').textContent = 'ชั้นปีที่ ' + REC.year + ' · ห้อง ' + REC.room;
     tick(); setInterval(tick, 1000);
     syncClock(); keepAwake();
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { keepAwake(); syncClock(); } });
