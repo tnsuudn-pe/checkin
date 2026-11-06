@@ -1,7 +1,7 @@
 /* ธีมร่วมทุกหน้า "Stadium Night" — แถบเมนูกระจกขาว + ตรามหาวิทยาลัย, หัวเรื่องแบบสนามกีฬายามค่ำ (ไฟสนาม + ลู่วิ่ง),
-   ตัวเลขแบบสกอร์บอร์ด (Kanit), การ์ดมุมโค้งเงาสองชั้น
+   หัวเรื่อง IBM Plex Sans Thai + ตัวเลขแบบสกอร์บอร์ด (Barlow Condensed), การ์ดมุมโค้งเงาสองชั้น
    โหลดหลัง <style> ของแต่ละหน้า จึงทับสไตล์หัวหน้าเดิม */
-@import url('https://fonts.googleapis.com/css2?family=Kanit:ital,wght@0,500;0,600;0,700;1,700&family=Prompt:wght@500;600;700&family=Sarabun:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@500;600;700&family=Barlow+Condensed:wght@600;700&family=Prompt:wght@500;600;700&family=Sarabun:wght@400;600;700&display=swap');
 
 :root {
   --brand-navy: #0a2a66;
@@ -20,7 +20,7 @@ body:not([data-dark]) {
   background: radial-gradient(1200px 500px at 50% -200px, #e4eaf6 0%, transparent 70%), var(--page-bg);
   background-attachment: fixed;
 }
-h1, h2, h3 { font-family: 'Kanit', 'Prompt', sans-serif; font-weight: 600; letter-spacing: .1px; }
+h1, h2, h3 { font-family: 'IBM Plex Sans Thai', 'Prompt', sans-serif; font-weight: 600; letter-spacing: 0; }
 /* ตัวเลขทุกตารางเรียงตรงหลักเหมือนสกอร์บอร์ด */
 table, .kpi, .num, td { font-variant-numeric: tabular-nums; }
 :focus-visible { outline: 3px solid var(--brand-gold); outline-offset: 2px; border-radius: 6px; }
@@ -36,7 +36,7 @@ header.site {
 header.site .wrap { max-width: 1100px; margin: 0 auto; padding: 8px 16px; display: flex; align-items: center; gap: 16px; }
 header.site .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; min-width: 0; }
 header.site .brand img { width: 46px; height: 48px; object-fit: contain; flex: none; filter: drop-shadow(0 2px 4px rgba(10, 42, 102, .18)); }
-header.site .brand b { display: block; font-family: 'Kanit', 'Prompt', sans-serif; font-weight: 600; font-size: 17px; line-height: 1.2; }
+header.site .brand b { display: block; font-family: 'IBM Plex Sans Thai', 'Prompt', sans-serif; font-weight: 600; font-size: 17px; line-height: 1.2; }
 header.site .brand small { display: block; font-size: 12px; color: #4b5873; line-height: 1.3; }
 header.site nav { margin-left: auto; display: flex; gap: 2px; }
 header.site nav a {
@@ -66,25 +66,19 @@ header.site nav a[aria-current="page"]::after {
 .band .wrap { position: relative; max-width: 1100px; margin: 0 auto; padding: 22px 16px 24px; display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .band .titles { flex: 1; min-width: 0; }
 /* ห่วงสามห่วงคล้องกัน (สีประจำมหาวิทยาลัยการกีฬาแห่งชาติ เขียว-ขาว-เหลือง)
-   เขียว = พลศึกษา · ขาว = จริยศึกษา · เหลือง = พุทธิศึกษา */
-:root { --ring1: #1fa055; --ring2: #ffffff; --ring3: #f5c518; }
+   เขียว = พลศึกษา · ขาว = จริยศึกษา · เหลือง = พุทธิศึกษา
+   สานกันแบบตราจริง: ห่วงซ้ายอยู่บนที่จุดตัดด้านบน ห่วงขวาอยู่บนที่จุดตัดด้านล่าง (วาดทับช่วงโค้งสั้น ๆ พร้อมเส้นเว้นสีพื้น) */
 .band .wrap::after {
   content: ''; position: absolute; right: 16px; top: 50%; width: 150px; height: 64px; transform: translateY(-50%); pointer-events: none; opacity: .9;
-  background:
-    radial-gradient(circle at 32px 32px, transparent 23px, var(--ring1) 24px 29px, transparent 30px),
-    radial-gradient(circle at 75px 32px, transparent 23px, var(--ring2) 24px 29px, transparent 30px),
-    radial-gradient(circle at 118px 32px, transparent 23px, var(--ring3) 24px 29px, transparent 30px);
+  background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 64' fill='none' stroke-width='5'><circle cx='32' cy='32' r='26.5' stroke='%231fa055'/><circle cx='75' cy='32' r='26.5' stroke='%23ffffff'/><circle cx='118' cy='32' r='26.5' stroke='%23f5c518'/><path d='M49.03 11.70A26.5 26.5 0 0 1 56.90 22.94' stroke='%23071636' stroke-width='8'/><path d='M49.03 11.70A26.5 26.5 0 0 1 56.90 22.94' stroke='%231fa055'/><path d='M92.03 11.70A26.5 26.5 0 0 1 99.90 22.94' stroke='%23071636' stroke-width='8'/><path d='M92.03 11.70A26.5 26.5 0 0 1 99.90 22.94' stroke='%23ffffff'/></svg>") center / contain no-repeat;
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .35));
-  animation: rings 6s ease-in-out infinite alternate;
 }
-@keyframes rings { to { transform: translateY(-50%) rotate(-4deg) scale(1.04); } }
 .band .titles { padding-right: 160px; }
 @media (max-width: 720px) { .band .wrap::after { right: -20px; scale: .6; opacity: .55; } .band .titles { padding-right: 70px; } }
-@media (prefers-reduced-motion: reduce) { .band .wrap::after { animation: none; } }
 .band .crumb { font-size: 13px; opacity: .85; margin-bottom: 4px; }
 .band .crumb a { color: #fff; }
 .band h1 {
-  margin: 0; font-family: 'Kanit', 'Prompt', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.25; color: #fff;
+  margin: 0; font-family: 'IBM Plex Sans Thai', 'Prompt', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.25; color: #fff;
   text-shadow: 0 2px 12px rgba(0, 0, 0, .25);
 }
 .band h1::before {   /* แถบทองเฉียงหน้าหัวเรื่อง */
