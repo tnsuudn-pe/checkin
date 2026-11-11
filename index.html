@@ -165,7 +165,15 @@
   .tro::after { content:''; position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .3s;
     background:radial-gradient(240px circle at var(--mx, 50%) var(--my, 30%), rgba(255,255,255,.22), transparent 60%); }
   .tro.tilt::after { opacity:1; }
-  .tro .art { width:132px; height:165px; transform:translateZ(40px); overflow:visible; }
+  .tro .art { width:108px; height:135px; transform:translateZ(40px); overflow:visible; }
+  .trophies { grid-template-columns:repeat(auto-fill, minmax(165px, 1fr)); }
+  .tro h3 { font-size:15px; }
+  /* ย่อเหลือแถวแรก (ความสูงตั้งจาก JS) + ไล่จางด้านล่าง */
+  .trophies.folded { overflow:hidden; -webkit-mask-image:linear-gradient(#000 70%, transparent); mask-image:linear-gradient(#000 70%, transparent); }
+  .more { display:flex; align-items:center; justify-content:center; gap:6px; width:100%; margin-top:10px; padding:10px; font:inherit; font-weight:600; font-size:14px;
+    color:var(--navy); background:#f3f5f9; border:1px solid var(--line); border-radius:12px; cursor:pointer; }
+  .more:hover { background:#eaeef5; }
+  .more[hidden] { display:none; }
   .tro .halo { transform-origin:60px 46px; animation:halo 14s linear infinite; }
   @keyframes halo { to { transform:rotate(360deg); } }
   .tro .tw { transform-box:fill-box; transform-origin:center; animation:tw 2.4s ease-in-out infinite; }
@@ -351,6 +359,7 @@
     <p class="sub">ทุกกิจกรรมมีถ้วยรางวัลของตัวเอง ลวดลายตามประเภทกิจกรรม — ปลดล็อกเมื่อปิดเช็คชื่อ ห้องที่มีร้อยละผู้เข้าร่วมสูงสุดได้ครองถ้วย (เสมอกันครองร่วมกัน) ·
       ระดับถ้วยตามร้อยละของห้องผู้ชนะ: 💎 แพลทินัม 100% · 🥇 ทอง ≥ 90% · 🥈 เงิน ≥ 80% · 🥉 ทองแดง ต่ำกว่า 80%</p>
     <div class="trophies" id="trophies"></div>
+    <button class="more" id="troMore" type="button" aria-controls="trophies" aria-expanded="false" hidden></button>
   </section>
 
   <section class="card" id="badgeCard">
@@ -820,6 +829,22 @@
     return best > 0 ? { best, rooms: rates.filter(x => x.v === best).map(x => x.r.room) } : null;
   }
 
+  // ย่อ/ขยายถ้วยรางวัล: ปกติแสดงแถวแรก จำสถานะในเครื่อง
+  function foldTrophies() {
+    const g = $('trophies'), b = $('troMore'), cards = g.querySelectorAll('.tro');
+    let open = false; try { open = localStorage.getItem('pe_tro_open') === '1'; } catch (e) { /* ไม่เป็นไร */ }
+    const first = cards[0], perRow = first ? cards.length - [...cards].filter(c => c.offsetTop > first.offsetTop).length : 0;
+    if (!first || perRow >= cards.length) { g.classList.remove('folded'); g.style.maxHeight = ''; b.hidden = true; return; }
+    const apply = () => {
+      g.classList.toggle('folded', !open); g.style.maxHeight = open ? '' : (first.offsetHeight + 40) + 'px';
+      b.setAttribute('aria-expanded', open);
+      b.textContent = open ? 'ย่อ ▴' : 'ดูถ้วยทั้งหมด ' + cards.length + ' ใบ ▾';
+    };
+    b.hidden = false; apply();
+    b.onclick = () => { open = !open; try { localStorage.setItem('pe_tro_open', open ? '1' : '0'); } catch (e) { /* ไม่เป็นไร */ } apply(); if (!open) $('trophyCard').scrollIntoView({ block: 'start', behavior: 'smooth' }); };
+  }
+  addEventListener('resize', () => { if ($('trophies').querySelector('.tro')) foldTrophies(); });
+
   function renderTrophies() {
     const cards = [], unlockedNow = [];
     DATA.activities.forEach((a, i) => {
@@ -839,6 +864,7 @@
         '<div class="lockmsg">' + (a.status === 'เปิดเช็คชื่อ' ? '⏳ กำลังเช็คชื่อ — ลุ้นผลเมื่อปิด' : 'ปลดล็อกเมื่อจบกิจกรรม') + '</div></div>');
     });
     $('trophies').innerHTML = cards.join('') || '<p class="muted">ยังไม่มีกิจกรรมในภาคเรียนนี้</p>';
+    foldTrophies();
     // การ์ดถ้วยเอียงตามเมาส์/นิ้ว (ผูกครั้งเดียว) — ปิดเมื่อผู้ใช้ตั้งลดการเคลื่อนไหว
     if (!$('trophies').dataset.tilt && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
       $('trophies').dataset.tilt = 1;
